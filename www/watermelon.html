@@ -873,7 +873,7 @@ function hitSfx(v) {
   const now = performance.now();
   if (now - lastHit < 60) return;
   lastHit = now;
-  sfx.hit(v);
+  SFX.hit(v);
 }
 let lastHit = 0;
 
@@ -1589,7 +1589,7 @@ function updateFx(dt) {
   if (shake > 0) shake = Math.max(0, shake - dt * 52);
 }
 
-function frame(ts) {
+function frameBody(ts) {
   if (!lastTs) lastTs = ts;
   let dt = (ts - lastTs) / 1000;
   lastTs = ts;
@@ -1616,6 +1616,12 @@ function frame(ts) {
 
   updateFx(dt);
   render(ts / 1000);
+}
+
+/* 主循环外壳：单帧异常不再中断 rAF，避免真机上"投放一次后整体卡死" */
+function frame(ts) {
+  try { frameBody(ts); }
+  catch (e) { (window.__errs = window.__errs || []).push('WM:' + (e && e.message)); }
   requestAnimationFrame(frame);
 }
 
