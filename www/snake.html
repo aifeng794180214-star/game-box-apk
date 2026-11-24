@@ -78,6 +78,22 @@
     opacity:0;transition:opacity .45s;pointer-events:none;white-space:nowrap}
   #hint.on{opacity:1}
 
+  /* ---------- 左下虚拟摇杆（手机端方向控制） ---------- */
+  #stick{position:fixed;left:calc(env(safe-area-inset-left,0px) + 12px);bottom:calc(var(--sB) + 92px);
+    width:104px;height:104px;border-radius:50%;z-index:9;touch-action:none;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 42%,rgba(34,60,96,.50),rgba(8,15,26,.52));
+    border:1px solid rgba(120,200,255,.30);
+    -webkit-backdrop-filter:blur(12px) saturate(150%);backdrop-filter:blur(12px) saturate(150%);
+    box-shadow:0 16px 32px -16px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.16)}
+  #stick .ring{position:absolute;inset:9px;border-radius:50%;border:1px dashed rgba(120,200,255,.22);pointer-events:none}
+  #stick .knob{width:44px;height:44px;border-radius:50%;pointer-events:none;
+    background:linear-gradient(160deg,#b6ecff,#4aa3ff);
+    box-shadow:0 0 22px rgba(90,200,255,.75),inset 0 -4px 10px rgba(0,60,120,.45);
+    transition:transform .14s ease-out}
+  #stick.on{border-color:rgba(140,235,255,.75);box-shadow:0 0 26px rgba(80,215,255,.45),inset 0 1px 0 rgba(255,255,255,.22)}
+  #stick.on .knob{transition:none}
+
   /* ---------- 弹窗 ---------- */
   #overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:18px;
     background:radial-gradient(circle at 50% 38%,rgba(10,22,40,.80),rgba(3,6,12,.95));
@@ -140,7 +156,9 @@
   <div id="buffs"></div>
 </div>
 
-<div id="hint">滑动屏幕转向</div>
+<div id="hint">拖动左下摇杆转向</div>
+
+<div id="stick" aria-label="方向摇杆"><i class="ring"></i><i class="knob"></i></div>
 
 <div id="props">
   <button class="prop" id="propShield" aria-label="护盾">
@@ -192,7 +210,7 @@ const I18N = {
   zh:{
     score:'得分', len:'长度', time:'时间', best:'最高',
     title:'贪食蛇大作战', sub:'2400×2400 能量竞技场 · 吞噬一切成长为最强的蛇',
-    t1:'滑动屏幕任意位置转向 · 每段滑动只转一次，松手可再滑',
+    t1:'拖动左下摇杆转向 · 也可滑动屏幕、或轻点左右半屏转弯',
     t2:'电脑：鼠标指向转向，方向键也可；越吃越长、越长越快',
     t3:'吃能量珠连击：连续快速进食倍率最高 ×5',
     t4:'救场道具（每局各 1 次）：护盾 3 秒无敌 · 狂暴 5 秒加速双倍分',
@@ -202,13 +220,13 @@ const I18N = {
     fLen:'最终长度', fScore:'总得分', fTime:'生存时间', fBest:'历史最高',
     newBest:'新纪录！', magnet:'磁铁', double:'双倍积分', ghost:'幽灵穿身',
     shield:'护盾', rage:'狂暴', shieldOn:'护盾 3s', rageOn:'狂暴 5s',
-    hint:'滑动屏幕转向', sec:'s',
+    hint:'拖动左下摇杆转向', sec:'s',
     skins:['翡翠萌蛇','烈焰赤龙','星空霓虹']
   },
   en:{
     score:'SCORE', len:'LENGTH', time:'TIME', best:'BEST',
     title:'SNAKE ARENA', sub:'A 2400×2400 energy arena — devour everything, grow the biggest snake',
-    t1:'Swipe anywhere to steer · one turn per swipe segment, lift to swipe again',
+    t1:'Steer with the bottom-left joystick, or swipe anywhere / tap either side to turn',
     t2:'Desktop: point with the mouse, or use arrow keys — longer means faster',
     t3:'Chain pellets fast for combo multipliers up to ×5',
     t4:'Rescue props (1 each per run): Shield 3s invincible · Rage 5s speed + double score',
@@ -218,7 +236,7 @@ const I18N = {
     fLen:'FINAL LENGTH', fScore:'TOTAL SCORE', fTime:'SURVIVED', fBest:'BEST SCORE',
     newBest:'NEW RECORD!', magnet:'Magnet', double:'Double Score', ghost:'Ghost',
     shield:'Shield', rage:'Rage', shieldOn:'Shield 3s', rageOn:'Rage 5s',
-    hint:'Swipe to steer', sec:'s',
+    hint:'Drag the joystick to steer', sec:'s',
     skins:['Emerald','Flame','Nebula']
   }
 };
@@ -449,13 +467,18 @@ const SW_MIN = 16;      // 首次触发位移阈值
 const SW_STEP = 30;     // 同一段滑动中再次转向需要的新位移
 const sw = { id:null, x0:0, y0:0, px:0, py:0, ang:0, locked:false };
 
+const tap = { x0:0, y0:0, t0:0, moved:0, on:false };
+function turnBy(a){ if (!G.running) return; aimAt(G.snake.target + a); }
+
 function tStart(e){
-  if (e.touches && e.touches.length > 1){ sw.id = null; return; }
+  sw.last = performance.now();
+  if (e.touches && e.touches.length > 1){ sw.id = null; tap.on = false; return; }
   const t = e.changedTouches[0];
   sw.id = t.identifier;
   sw.x0 = sw.px = t.clientX;
   sw.y0 = sw.py = t.clientY;
   sw.locked = false;
+  tap.x0 = t.clientX; tap.y0 = t.clientY; tap.t0 = performance.now(); tap.moved = 0; tap.on = true;
   document.getElementById('hint').classList.remove('on');
   e.preventDefault();
 }
@@ -469,6 +492,8 @@ function tMove(e){
   const cx = t.clientX, cy = t.clientY;
   const dx = cx - sw.x0, dy = cy - sw.y0;
   const d = Math.hypot(dx, dy);
+  sw.last = performance.now();
+  if (d > tap.moved) tap.moved = d;
 
   if (!sw.locked){
     if (d >= SW_MIN){
@@ -490,8 +515,15 @@ function tMove(e){
   e.preventDefault();
 }
 function tEnd(e){
-  if (sw.id === null) return;
-  sw.id = null; sw.locked = false;
+  sw.last = performance.now();
+  if (sw.id !== null){
+    /* 轻点未移动 → 左右半屏各转 90°（滑动被系统手势拦截时的备用控制） */
+    if (e && e.type === 'touchend' && tap.on && tap.moved < 14 && performance.now() - tap.t0 < 340){
+      turnBy(tap.x0 < innerWidth / 2 ? -Math.PI/2 : Math.PI/2);
+    }
+    sw.id = null; sw.locked = false;
+  }
+  tap.on = false;
   if (e && e.preventDefault) e.preventDefault();
 }
 cv.addEventListener('touchstart',  tStart, { passive:false });
@@ -499,12 +531,14 @@ cv.addEventListener('touchmove',   tMove,  { passive:false });
 cv.addEventListener('touchend',    tEnd,   { passive:false });
 cv.addEventListener('touchcancel', tEnd,   { passive:false });
 
-/* --- 鼠标 --- */
+/* --- 鼠标（触屏后忽略合成鼠标事件，避免与摇杆打架） --- */
+const touchRecent = () => performance.now() - (sw.last || 0) < 500;
 window.addEventListener('mousemove', e=>{
+  if (touchRecent()) return;
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
 }, { passive:true });
 window.addEventListener('mousedown', e=>{
-  if (e.button !== 0) return;
+  if (e.button !== 0 || touchRecent()) return;
   const t = e.target;
   if (t && t.closest && t.closest('button, a, .panel, #overlay, #props')) return;
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
@@ -522,8 +556,94 @@ window.addEventListener('keydown', e=>{
   if (a !== null){ e.preventDefault(); aimAt(a); }
 });
 
+/* --- 左下虚拟摇杆：真机主控制通道（指针事件优先，touch 兜底） --- */
+const stickEl = document.getElementById('stick');
+const knobEl  = stickEl ? stickEl.querySelector('.knob') : null;
+let stickId = null, stickPtr = false;
+
+function stickApply(cx, cy){
+  const r = stickEl.getBoundingClientRect();
+  const ox = r.left + r.width/2, oy = r.top + r.height/2;
+  const dx = cx - ox, dy = cy - oy;
+  const d = Math.hypot(dx, dy);
+  const lim = r.width/2 - 22;
+  const k = d > lim ? lim/d : 1;
+  knobEl.style.transform = 'translate(' + (dx*k).toFixed(1) + 'px,' + (dy*k).toFixed(1) + 'px)';
+  if (d > 7) aimAt(Math.atan2(dy, dx));
+}
+function stickReset(){
+  if (knobEl) knobEl.style.transform = 'translate(0px,0px)';
+  stickEl.classList.remove('on');
+  stickId = null; stickPtr = false;
+  sw.last = 0;
+}
+if (stickEl){
+  if (!('ontouchstart' in window) && !(navigator.maxTouchPoints > 0)) stickEl.style.display = 'none';
+  stickEl.addEventListener('pointerdown', e=>{
+    stickPtr = true; stickId = e.pointerId; stickEl.classList.add('on');
+    try { stickEl.setPointerCapture(e.pointerId); } catch(err){}
+    sw.last = performance.now();
+    stickApply(e.clientX, e.clientY);
+    e.preventDefault(); e.stopPropagation();
+  });
+  stickEl.addEventListener('pointermove', e=>{
+    if (!stickPtr || stickId !== e.pointerId) return;
+    stickApply(e.clientX, e.clientY);
+    e.preventDefault(); e.stopPropagation();
+  });
+  const pUp = e=>{ if (stickPtr && stickId === e.pointerId) stickReset(); };
+  stickEl.addEventListener('pointerup', pUp);
+  stickEl.addEventListener('pointercancel', pUp);
+  /* touch 兜底：指针事件未生效时接管 */
+  stickEl.addEventListener('touchstart', e=>{
+    if (stickPtr) return;
+    const t = e.changedTouches[0];
+    stickId = t.identifier; stickEl.classList.add('on');
+    stickApply(t.clientX, t.clientY);
+    e.preventDefault(); e.stopPropagation();
+  }, { passive:false });
+  stickEl.addEventListener('touchmove', e=>{
+    if (stickPtr) return;
+    for (let i=0;i<e.changedTouches.length;i++){
+      if (e.changedTouches[i].identifier === stickId){
+        stickApply(e.changedTouches[i].clientX, e.changedTouches[i].clientY); break;
+      }
+    }
+    e.preventDefault(); e.stopPropagation();
+  }, { passive:false });
+  const tUp = e=>{ if (!stickPtr) stickReset(); e.preventDefault(); e.stopPropagation(); };
+  stickEl.addEventListener('touchend', tUp, { passive:false });
+  stickEl.addEventListener('touchcancel', tUp, { passive:false });
+}
+
+/* --- 指针事件兜底（部分 WebView 触摸事件不达页面时仍可控） --- */
+let ptrId = null, ptrS = null;
+const ptrAlive = () => performance.now() - (sw.last || 0) > 130;
+cv.addEventListener('pointerdown', e=>{
+  if (e.pointerType === 'mouse' || !ptrAlive()) return;
+  ptrId = e.pointerId;
+  ptrS = { x:e.clientX, y:e.clientY, t:performance.now(), moved:0, cx:e.clientX };
+  try { cv.setPointerCapture(e.pointerId); } catch(err){}
+});
+cv.addEventListener('pointermove', e=>{
+  if (ptrId !== e.pointerId || !ptrS || !ptrAlive()) return;
+  const dx = e.clientX - ptrS.x, dy = e.clientY - ptrS.y;
+  const d = Math.hypot(dx, dy);
+  if (d > ptrS.moved) ptrS.moved = d;
+  if (d >= 16){ aimAt(Math.atan2(dy, dx)); ptrS.cx = e.clientX; }
+});
+function ptrUp(e){
+  if (ptrId !== e.pointerId || !ptrS) return;
+  if (e.type === 'pointerup' && ptrS.moved < 14 && performance.now() - ptrS.t < 340 && ptrAlive()){
+    turnBy(ptrS.cx < innerWidth / 2 ? -Math.PI/2 : Math.PI/2);
+  }
+  ptrId = null; ptrS = null;
+}
+cv.addEventListener('pointerup', ptrUp);
+cv.addEventListener('pointercancel', ptrUp);
+
 function aimByMouse(){
-  if (!G.running || !mouse.active) return;
+  if (!G.running || !mouse.active || touchRecent()) return;
   const s = G.snake;
   const hx = (s.x - cam.x)*cam.zoom + VW/2;
   const hy = (s.y - cam.y)*cam.zoom + VH/2;

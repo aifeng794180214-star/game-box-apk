@@ -24,6 +24,8 @@ echo "== [1/7] 同步 www -> assets/www"
 rm -rf build/assets/www
 mkdir -p build/assets/www
 cp -r "$P/www/." build/assets/www/
+# 只保留大厅 + 6 款正式游戏（草稿页不进包）
+rm -f build/assets/www/hexa.html build/assets/www/screw.html build/assets/www/neon.html build/assets/www/stick.html
 # 打包大厅与全部 10 款正式游戏
 ls build/assets/www | tr '\n' ' '
 echo
