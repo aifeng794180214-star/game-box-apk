@@ -294,9 +294,10 @@
           S.walkT = 0;
           // 计分
           var add = S.pendingPerfect ? 2 : 1;
-          S.score += add;
+          var wireBonus = (S.wire && S.pendingPerfect) ? 2 : 0;
+          S.score += add + wireBonus;
           if (S.pendingPerfect) S.perfects++;
-          showCombo(S.pendingPerfect ? 'PERFECT ×2' : '+1');
+          showCombo(S.pendingPerfect ? (wireBonus ? '钢丝 PERFECT ×4' : 'PERFECT ×2') : '+1');
           SFX.coin ? SFX.coin() : SFX.pop();
           updateHud();
         } else {
@@ -321,8 +322,8 @@
           S.state = 'ready';
           S.bridgeLen = 0;
           S.charge = 0;
-          // 走钢丝：10 分后每 3 根触发
-          S.wire = S.score >= 10 && (S.score % 3 === 0);
+          // 走钢丝：10 分后每 4 根触发
+          S.wire = S.score >= 10 && (S.idx % 4 === 3);
           ensurePillars();
           setTip(S.wire ? '走钢丝！倒挂通过可得奖励' : '按住屏幕蓄力 · 松手搭桥');
           if (S.bigScore !== true && S.score >= 10) { S.bigScore = true; }
@@ -340,10 +341,10 @@
       if (S.heroY > H + 120) gameOver();
     }
 
-    // 相机
-    var targetCam = S.heroX - W * 0.28;
-    if (S.state === 'ready' || S.state === 'charging') {
-      S.camX += (targetCam - S.camX) * Math.min(1, dt * 5.2);
+    // 相机（坠落与结算时锁死）
+    if (S.state !== 'dying' && S.state !== 'dead') {
+      var targetCam = S.heroX - W * 0.28;
+      S.camX += (targetCam - S.camX) * Math.min(1, dt * 7.2);
     }
   }
 
