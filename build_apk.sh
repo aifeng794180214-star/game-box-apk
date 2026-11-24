@@ -25,7 +25,7 @@ rm -rf build/assets/www
 mkdir -p build/assets/www
 cp -r "$P/www/." build/assets/www/
 # 只打包大厅与 6 款正式游戏，排除草稿页
-rm -f build/assets/www/hexa.html build/assets/www/screw.html build/assets/www/neon.html
+rm -f build/assets/www/hexa.html build/assets/www/screw.html build/assets/www/neon.html build/assets/www/stick.html
 ls build/assets/www
 
 echo "== [2/7] aapt2 compile"

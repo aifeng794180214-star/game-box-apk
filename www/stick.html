@@ -208,10 +208,10 @@
     for (var i = S.idx; i < Math.min(S.idx + 4, S.pillars.length); i++) {
       var a = S.pillars[i], b = S.pillars[i + 1];
       if (!b) break;
-      var d = b.x - (a.x + a.w);
+      var d = b.x - (a.x + a.w) + b.w + 14;
       if (d > need) need = d;
     }
-    maxLen = Math.min(W * 0.78, Math.max(need + 26, W * 0.42));
+    maxLen = Math.min(W * 0.82, Math.max(need, W * 0.46));
   }
 
   function startCharge() {
