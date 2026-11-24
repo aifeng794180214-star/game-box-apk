@@ -265,6 +265,14 @@
     speed: 210, spawnT: 0, passedFirst: false, hue: 0
   };
   var G = 1520, FLAP = -470;
+  window.__DBG = function () {
+    var pp = null;
+    for (var i = 0; i < S.pipes.length; i++) if (S.pipes[i].x + S.pipes[i].w > S.bird.x - S.bird.r) { pp = S.pipes[i]; break; }
+    return { mode: S.mode, score: S.score, best: S.best, by: Math.round(S.bird.y), vy: Math.round(S.bird.vy),
+      r: S.bird.r, invuln: +S.invuln.toFixed(2), rush: +S.rushT.toFixed(2), combo: S.combo,
+      pipe: pp ? { x: Math.round(pp.x), gap: Math.round(pp.gap), gy: Math.round(pp.gy), top: Math.round(pp.gy), bot: Math.round(pp.gy + pp.gap), w: Math.round(pp.w) } : null,
+      W: W, H: H };
+  };
 
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -359,7 +367,14 @@
   function multiplier() { return S.combo >= 6 ? 3 : S.combo >= 3 ? 2 : 1; }
   function addScore(n) {
     S.score += n;
-    if (S.score > S.best) { S.best = S.score; writeLS(LS_BEST, String(S.best)); }
+    if (S.score > S.best) {
+      S.best = S.score; writeLS(LS_BEST, String(S.best));
+      try {                                 // 同步到大厅统一统计键
+        var k = 'gb:stat:neon', s = JSON.parse(localStorage.getItem(k) || '{}');
+        if (!(s.best >= S.best)) { s.best = S.best; s.last = Date.now(); if (!s.plays) s.plays = 1; s.totalScore = s.totalScore || 0;
+          localStorage.setItem(k, JSON.stringify(s)); }
+      } catch (e) {}
+    }
     updateHud();
   }
 

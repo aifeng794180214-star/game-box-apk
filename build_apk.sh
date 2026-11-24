@@ -24,9 +24,9 @@ echo "== [1/7] 同步 www -> assets/www"
 rm -rf build/assets/www
 mkdir -p build/assets/www
 cp -r "$P/www/." build/assets/www/
-# 只打包大厅与 6 款正式游戏，排除草稿页
-rm -f build/assets/www/hexa.html build/assets/www/screw.html build/assets/www/neon.html build/assets/www/stick.html
-ls build/assets/www
+# 打包大厅与全部 10 款正式游戏
+ls build/assets/www | tr '\n' ' '
+echo
 
 echo "== [2/7] aapt2 compile"
 "$BT/aapt2.exe" compile --dir res -o build/res.zip

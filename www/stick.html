@@ -190,7 +190,14 @@
   function pillarY(p) { return p.top; }
 
   function loadBest() { try { return parseInt(localStorage.getItem(LS_BEST) || '0', 10) || 0; } catch (e) { return 0; } }
-  function saveBest(v) { try { localStorage.setItem(LS_BEST, String(v)); } catch (e) {} }
+  function saveBest(v) {
+    try { localStorage.setItem(LS_BEST, String(v)); } catch (e) {}
+    try {                                   // 同步到大厅统一统计键
+      var k = 'gb:stat:stick', s = JSON.parse(localStorage.getItem(k) || '{}');
+      if (!(s.best >= v)) { s.best = v; s.last = Date.now(); if (!s.plays) s.plays = 1; s.totalScore = s.totalScore || 0;
+        localStorage.setItem(k, JSON.stringify(s)); }
+    } catch (e) {}
+  }
 
   function updateHud() {
     elScore.textContent = S.score;

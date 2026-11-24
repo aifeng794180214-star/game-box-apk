@@ -129,7 +129,10 @@ const CLEAR_N = 10;
 
 let W = 0, H = 0, DPR = 1, safeTop = 0, safeBottom = 0;
 let R = 30, gap = 4;
-let cells = [], rows = [4, 5, 6, 7, 6, 5, 4];
+const ROWS_SMALL = [3, 4, 5, 4, 3];          // 19 格
+const ROWS_BIG = [4, 5, 6, 7, 6, 5, 4];      // 37 格
+const BIG_BOARD_AT = 800;                    // 最高分达到后解锁大棋盘
+let cells = [], rows = ROWS_SMALL.slice();
 let tray = [], props = { hammer: 3, refresh: 3, swap: 3 };
 let score = 0, best = 0, busy = false, dead = false, chainShown = 0;
 let flights = [], burstsFx = [], mode = null, swapFrom = null;
@@ -307,10 +310,11 @@ function reset() {
   props = { hammer: 3, refresh: 3, swap: 3 };
   flights = []; burstsFx = []; drag = null; hoverCell = null;
   Juice.resetCombo();
+  rows = (best >= BIG_BOARD_AT ? ROWS_BIG : ROWS_SMALL).slice();
   buildCells();
   // 初始撒一些筹码，制造合并机会
   const seedColors = COLORS.slice();
-  const nSeed = 9;
+  const nSeed = Math.round(cells.length * 0.24);
   for (let i = 0; i < nSeed; i++) {
     const e = emptyCells();
     if (!e.length) break;
@@ -354,7 +358,16 @@ function paintProps() {
   });
 }
 
-function addScore(v) { score += v; paintHud(); }
+let bestSaveT = 0;
+function addScore(v) {
+  score += v;
+  if (score > best) {
+    best = score;
+    const now = performance.now();
+    if (now - bestSaveT > 700) { bestSaveT = now; Juice.setBest('hexa', best); }
+  }
+  paintHud();
+}
 
 /* ==================== 飞行筹码 ==================== */
 function flyChip(color, from, to, dur, opt) {
@@ -393,13 +406,15 @@ function drawFlights(now) {
 async function resolveBoard(chainStart) {
   let chain = chainStart || 0;
   let totalGain = 0;
+  let guard = 0;
   while (true) {
+    if (++guard > 120) break;
     // 1) 先处理满 10 层的消除
     let cleared = false;
     for (const cell of cells.slice()) {
       if (cell.stack.length >= CLEAR_N) {
         cleared = true;
-        const gain = Math.round(180 * Math.pow(1.6, chain));
+        const gain = Math.round(120 * Math.pow(1.42, Math.min(chain, 5)));
         addScore(gain); totalGain += gain;
         await clearCell(cell, chain);
         chain++;
@@ -409,41 +424,41 @@ async function resolveBoard(chainStart) {
 
     // 2) 收集可合并的筹码
     const moves = [];
+    const usedFrom = new Set(), usedTo = new Set();
     for (const cell of cells) {
-      if (!cell.stack.length) continue;
+      if (!cell.stack.length || usedFrom.has(cell) || usedTo.has(cell)) continue;
       const color = cell.stack[cell.stack.length - 1];
       const tars = neighbors(cell).filter(n =>
         n.stack.length && n.stack.length < CLEAR_N &&
+        n.stack.length + cell.stack.length <= CLEAR_N &&
+        !usedFrom.has(n) && !usedTo.has(n) &&
         n.stack[n.stack.length - 1] === color);
       if (!tars.length) continue;
       tars.sort((a, b) => b.stack.length - a.stack.length);
+      usedFrom.add(cell); usedTo.add(tars[0]);
       moves.push({ from: cell, to: tars[0], color });
     }
     if (!moves.length) break;
 
-    // 3) 同色筹码弧线翻跟头飞过去
+    // 3) 同色整堆弧线翻跟头合并
     moves.forEach((m, i) => {
-      m.from.stack.pop();
-      const from = { x: m.from.x, y: stackTopY(m.from) };
-      const to = { x: m.to.x, y: stackTopY(m.to) };
-      const dur = 190 + i * 26;
-      setTimeout(() => {
-        flyChip(m.color, from, to, dur, { arc: -R * (0.9 + Math.random() * 0.9), flip: true })
-          .then(() => {
-            m.to.stack.push(m.color);
-            m.to.flash = 1;
-            sfxClack(chain * 2 + Math.random() * 3);
-          });
-      }, i * 26);
+      const moving = m.from.stack.splice(0, m.from.stack.length);
+      const target = m.to;
+      moving.forEach((c, k) => {
+        setTimeout(() => {
+          flyChip(c, { x: m.from.x, y: m.from.y - k * 2 }, { x: target.x, y: stackTopY(target) },
+            190 + i * 26, { arc: -R * (0.9 + Math.random() * 0.9), flip: true })
+            .then(() => { target.stack.push(c); target.flash = 1; sfxClack(chain * 2 + Math.random() * 3); });
+        }, i * 26 + k * 40);
+      });
     });
-    const gain = 14 * moves.length + chain * 20;
+    const gain = 4 * moves.length;
     addScore(gain); totalGain += gain;
     if (moves.length >= 2) {
-      Juice.float((moves.length + ' 连合') + (chain > 0 ? ' ×' + (chain + 1) : ''), W / 2, boardBox.y + 30,
+      Juice.float(moves.length + ' 连合', W / 2, boardBox.y + 104,
         { color: '#ffe08a', size: 19, glow: 'rgba(255,200,80,.7)' });
-      Juice.sfx.combo(chain + 1);
+      Juice.sfx.combo(moves.length);
     }
-    chain++;
     await wait(210 + moves.length * 26);
     // 等待飞行落地
     await waitUntil(() => flights.length === 0);
@@ -471,7 +486,7 @@ async function clearCell(cell, chain) {
     count: 26, colors: COLORS, speed: 300, size: 5, gravity: 700,
     shape: 'square', life: 780
   });
-  Juice.float('+' + Math.round(180 * Math.pow(1.6, chain)), cell.x, cell.y - R, {
+  Juice.float('+' + Math.round(90 * Math.pow(1.42, Math.min(chain, 5))), cell.x, cell.y - R, {
     color: '#fff3c4', size: 24, glow: 'rgba(255,220,120,.8)'
   });
   if (chain >= 1) {
@@ -846,6 +861,7 @@ function loop(now) {
 }
 
 /* ==================== 启动 ==================== */
+window.__DBG = () => ({ rowsLen: rows.length, nCells: cells.length, best: best, score: score, busy: busy, dead: dead, occ: cells.filter(c => c.stack.length).length, full: cells.filter(c => c.stack.length).map(c => ({ x: Math.round(c.x), y: Math.round(c.y), n: c.stack.length })), maxst: Math.max.apply(null, cells.map(c => c.stack.length)), dragIdx: drag ? drag.slot : -1, mode: mode, props: JSON.parse(JSON.stringify(props)), tray: tray.map(s => ({ n: s.chips.length, x: Math.round(s.x), y: Math.round(s.y) })), box: { y: Math.round(boardBox.y), h: Math.round(boardBox.h) }, R: Math.round(R) });
 Juice.init({ game: 'hexa' });
 best = Juice.getStat('hexa').best || 0;
 buildCells();
