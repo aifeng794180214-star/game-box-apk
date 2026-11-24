@@ -519,5 +519,16 @@
     }
   };
 
+  // 统一错误采集（供自测/排障使用，正常游玩零开销）
+  if (!window.__errs) {
+    window.__errs = [];
+    window.addEventListener('error', function (e) {
+      window.__errs.push(String(e.message || (e.error && e.error.message) || e.type));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) {
+      window.__errs.push('promise:' + String(e.reason && e.reason.message || e.reason));
+    });
+  }
+
   window.Juice = J;
 })();

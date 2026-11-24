@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1b3a">
+<title>🎋 撑杆走钢丝 · Stick Hero</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0b1b3a;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    overscroll-behavior:none;touch-action:none}
+  #cv{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #safeprobe{position:fixed;top:0;left:0;width:1px;height:env(safe-area-inset-top,0px);opacity:0;pointer-events:none}
+  #hud{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 46px);
+    text-align:center;pointer-events:none;z-index:5;transition:opacity .3s}
+  #score{font:800 46px/1 -apple-system,"PingFang SC",sans-serif;color:#fff;
+    text-shadow:0 3px 18px rgba(0,0,0,.55);letter-spacing:1px}
+  #bestline{margin-top:6px;font:700 11px/1 -apple-system,"PingFang SC",sans-serif;
+    color:rgba(255,255,255,.62);letter-spacing:2px}
+  #tip{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 54px);
+    text-align:center;font:700 13px/1.5 -apple-system,"PingFang SC",sans-serif;
+    color:rgba(255,255,255,.72);pointer-events:none;z-index:5;transition:opacity .4s}
+  #ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(120% 90% at 50% 0%,rgba(20,32,72,.72),rgba(6,10,26,.94));
+    backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);z-index:8;
+    opacity:0;pointer-events:none;transition:opacity .28s;padding:0 24px}
+  #ov.show{opacity:1;pointer-events:auto}
+  #ovTitle{font:800 30px/1.2 -apple-system,"PingFang SC",sans-serif;color:#fff;letter-spacing:1px;
+    text-shadow:0 6px 30px rgba(90,160,255,.5)}
+  #ovSub{margin-top:10px;font:600 12.5px/1.7 -apple-system,"PingFang SC",sans-serif;
+    color:rgba(255,255,255,.6);text-align:center;letter-spacing:.5px}
+  #ovBig{margin:18px 0 2px;font:800 54px/1 -apple-system,"PingFang SC",sans-serif;color:#ffd76e;
+    text-shadow:0 0 32px rgba(255,190,80,.5);display:none}
+  #ovBig.show{display:block}
+  #heroes{display:flex;gap:14px;margin:24px 0 6px}
+  .hero{width:62px;height:78px;border-radius:14px;background:rgba(255,255,255,.055);
+    border:1.5px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:2px;transition:transform .16s,border-color .2s,background .2s;cursor:pointer}
+  .hero:active{transform:scale(.93)}
+  .hero.on{border-color:rgba(120,190,255,.85);background:rgba(90,150,255,.18);
+    box-shadow:0 0 0 1px rgba(120,190,255,.35),0 8px 24px rgba(60,110,220,.35)}
+  .hero.lock{opacity:.4}
+  .hero canvas{width:38px;height:46px;display:block}
+  .hero .lk{font:700 8.5px/1 -apple-system,"PingFang SC",sans-serif;color:rgba(255,255,255,.75)}
+  #btnStart{margin-top:20px;padding:16px 54px;border:none;border-radius:18px;
+    background:linear-gradient(135deg,#5aa9ff,#3b6fe0);color:#fff;
+    font:800 17px/1 -apple-system,"PingFang SC",sans-serif;letter-spacing:3px;
+    box-shadow:0 12px 34px rgba(60,110,220,.45);cursor:pointer;transition:transform .14s}
+  #btnStart:active{transform:scale(.95)}
+  #btnBack{margin-top:14px;font:700 12px/1 -apple-system,"PingFang SC",sans-serif;
+    color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:1px}
+  #combo{position:fixed;left:0;right:0;top:44%;text-align:center;pointer-events:none;z-index:6;
+    font:800 30px/1 -apple-system,"PingFang SC",sans-serif;color:#ffe08a;opacity:0;
+    text-shadow:0 0 26px rgba(255,190,70,.7);transition:opacity .2s}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="safeprobe"></div>
+<div id="hud"><div id="score">0</div><div id="bestline">BEST 0</div></div>
+<div id="tip">按住屏幕蓄力 · 松手搭桥</div>
+<div id="combo"></div>
+<div id="ov">
+  <div id="ovTitle">撑杆走钢丝</div>
+  <div id="ovSub">按住蓄力，松手落桥<br>桥搭在柱心「双倍分」</div>
+  <div id="ovBig">0</div>
+  <div id="heroes"></div>
+  <button id="btnStart">开始</button>
+  <a id="btnBack" href="index.html">返回大厅</a>
+</div>
+
+<script src="juice.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var elScore = document.getElementById('score'), elBest = document.getElementById('bestline');
+  var elOv = document.getElementById('ov'), elTitle = document.getElementById('ovTitle'),
+      elSub = document.getElementById('ovSub'), elBig = document.getElementById('ovBig'),
+      elHeroes = document.getElementById('heroes'), btnStart = document.getElementById('btnStart'),
+      elTip = document.getElementById('tip'), elCombo = document.getElementById('combo');
+
+  var LS_BEST = 'stickhero_best_v1';
+  var LS_HERO = 'stickhero_hero_v1';
+  var SFX = (window.Juice && window.Juice.sfx) || { click: f, tap: f, pop: f, place: f, hit: f, coin: f, win: f, over: f, prop: f, combo: f, clear: f };
+  function f() {}
+  function vib(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+  var W = 0, H = 0, DPR = 1, safeTop = 0;
+  var GROUND = 0;   // 地面（柱底）屏幕 y
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 3);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var sp = document.getElementById('safeprobe');
+    safeTop = sp ? sp.getBoundingClientRect().height : 0;
+    GROUND = H * 0.88;
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function () { setTimeout(resize, 220); });
+
+  // ---------- 数据 ----------
+  var HEROES = [
+    { id: 0, name: '行者', need: 0 },
+    { id: 1, name: '巫师', need: 3 },
+    { id: 2, name: '斗篷', need: 6 },
+    { id: 3, name: '机甲', need: 10 }
+  ];
+  var SKY = [
+    { a: '#123a7a', b: '#5b8fd8', c: '#0a1730', moon: 0, star: 0 },
+    { a: '#3d1f52', b: '#d1735c', c: '#160d24', moon: 0, star: 0 },
+    { a: '#0a1030', b: '#25306e', c: '#05060f', moon: 1, star: 1 },
+    { a: '#062334', b: '#12706a', c: '#04121a', moon: 1, star: 1 }
+  ];
+
+  var S = null;
+
+  function newPillar(x, prevTop) {
+    var diff = S ? Math.min(4 + S.score * 0.6, 14) : 4;
+    var hRatio = 0.17 + Math.random() * 0.16;
+    var w = Math.max(44, 76 - S.score * 0.75);
+    return {
+      x: x,
+      w: w,
+      h: hRatio,
+      top: prevTop + (Math.random() * 2 - 1) * 0.035,
+      bridge: 0
+    };
+  }
+
+  function reset() {
+    var best = loadBest();
+    S = {
+      state: 'ready',      // ready | charging | bridging | walking | dying | dead
+      score: 0,
+      best: best,
+      perfects: 0,
+      charge: 0,
+      camX: 0,
+      camTarget: 0,
+      hero: parseInt(localStorage.getItem(LS_HERO) || '0', 10) || 0,
+      pillars: [],
+      idx: 0,              // 当前所在柱下标
+      bridgeLen: 0,
+      bridgeGrow: 0,
+      pendingOK: false,
+      pendingPerfect: false,
+      heroX: 0,
+      heroY: 0,
+      heroRot: 0,
+      t: 0,
+      walkT: 0,
+      walkFrom: 0, walkTo: 0,
+      fallV: 0,
+      wire: false,         // 本关是否为走钢丝
+      bigScore: false
+    };
+    // 起始柱 + 后续柱
+    var x0 = 40;
+    S.pillars.push({ x: x0, w: 78, h: 0.26, top: 0.44, bridge: 0 });
+    var last = S.pillars[0].x + S.pillars[0].w;
+    for (var i = 0; i < 6; i++) {
+      var p = newPillar(last + gapFor(S.score + i), S.pillars[S.pillars.length - 1].top);
+      S.pillars.push(p);
+      last = p.x + p.w;
+    }
+    S.idx = 0;
+    S.heroX = S.pillars[0].x + S.pillars[0].w - 16;
+    S.heroY = GROUND - S.pillars[0].h * H;
+    S.camX = S.heroX - W * 0.28;
+    S.camTarget = S.camX;
+    S.state = 'ready';
+    S.bridgeLen = 0; S.bridgeGrow = 0;
+    S.heroRot = 0;
+    updateHud();
+    setTip('按住屏幕蓄力 · 松手搭桥');
+  }
+
+  function gapFor(sc) {
+    return Math.round(Math.min(96 + sc * 4.2 + Math.random() * 46, 208));
+  }
+
+  function pillarTop(p) { return GROUND - p.h * H; }
+  function pillarY(p) { return p.top; }
+
+  function loadBest() { try { return parseInt(localStorage.getItem(LS_BEST) || '0', 10) || 0; } catch (e) { return 0; } }
+  function saveBest(v) { try { localStorage.setItem(LS_BEST, String(v)); } catch (e) {} }
+
+  function updateHud() {
+    elScore.textContent = S.score;
+    elBest.textContent = 'BEST ' + Math.max(S.best, S.score);
+  }
+
+  function setTip(t) { elTip.textContent = t; elTip.style.opacity = t ? 1 : 0; }
+
+  // ---------- 蓄力与落桥 ----------
+  var CHARGE_TIME = 1.02;            // 满蓄力耗时
+  var maxLen = 0;
+  function computeMaxLen() {
+    // 最大桥长必须覆盖最远间距
+    var need = 0;
+    for (var i = S.idx; i < Math.min(S.idx + 4, S.pillars.length); i++) {
+      var a = S.pillars[i], b = S.pillars[i + 1];
+      if (!b) break;
+      var d = b.x - (a.x + a.w);
+      if (d > need) need = d;
+    }
+    maxLen = Math.min(W * 0.78, Math.max(need + 26, W * 0.42));
+  }
+
+  function startCharge() {
+    if (S.state !== 'ready') return;
+    computeMaxLen();
+    S.state = 'charging';
+    S.charge = 0;
+    S.bridgeLen = 0;
+    setTip('松手搭桥');
+    SFX.tap();
+  }
+
+  function releaseCharge() {
+    if (S.state !== 'charging') return;
+    var cur = S.pillars[S.idx], nxt = S.pillars[S.idx + 1];
+    var px = cur.x + cur.w;
+    var end = px + S.bridgeLen;
+    var landOK = nxt && end >= nxt.x && end <= nxt.x + nxt.w;
+    var perfect = false;
+    if (landOK) {
+      var ctr = nxt.x + nxt.w / 2;
+      perfect = Math.abs(end - ctr) <= nxt.w * 0.17;
+    }
+    S.pendingPerfect = perfect;
+    S.pendingOK = !!landOK;
+    S.state = 'bridging';
+    S.bridgeGrow = 0;
+    cur.bridge = S.bridgeLen;
+    if (S.bridgeLen < 8) S.bridgeLen = 8;
+    SFX.swipe();
+    vib(10);
+    setTip('');
+  }
+
+  function onDown(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (S.state === 'ready') { startCharge(); }
+  }
+  function onUp(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (S.state === 'charging') { releaseCharge(); }
+  }
+
+  cv.addEventListener('pointerdown', onDown, { passive: false });
+  window.addEventListener('pointerup', onUp, { passive: false });
+  window.addEventListener('pointercancel', onUp, { passive: false });
+  window.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); if (S.state === 'ready') startCharge(); }
+  });
+  window.addEventListener('keyup', function (e) {
+    if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); if (S.state === 'charging') releaseCharge(); }
+  });
+  window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // ---------- 主循环 ----------
+  var lastT = 0;
+  function loop(now) {
+    if (!lastT) lastT = now;
+    var dt = Math.min((now - lastT) / 1000, 0.05);
+    lastT = now;
+    S.t += dt;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt) {
+    if (S.state === 'charging') {
+      S.charge = Math.min(1, S.charge + dt / CHARGE_TIME);
+      S.bridgeLen = S.charge * maxLen;
+    } else if (S.state === 'bridging') {
+      S.bridgeGrow = Math.min(1, S.bridgeGrow + dt / 0.16);
+      if (S.bridgeGrow >= 1) {
+        if (S.pendingOK) {
+          S.state = 'walking';
+          var cur = S.pillars[S.idx], nxt = S.pillars[S.idx + 1];
+          S.walkFrom = S.heroX;
+          S.walkTo = nxt.x + nxt.w * 0.42;
+          S.walkDur = Math.max(0.22, (S.walkTo - S.walkFrom) / 620);
+          S.walkT = 0;
+          // 计分
+          var add = S.pendingPerfect ? 2 : 1;
+          S.score += add;
+          if (S.pendingPerfect) S.perfects++;
+          showCombo(S.pendingPerfect ? 'PERFECT ×2' : '+1');
+          SFX.coin ? SFX.coin() : SFX.pop();
+          updateHud();
+        } else {
+          S.state = 'walking';
+          var c2 = S.pillars[S.idx];
+          S.walkFrom = S.heroX;
+          S.walkTo = c2.x + c2.w + S.bridgeLen - 4;
+          S.walkDur = Math.max(0.3, (S.walkTo - S.walkFrom) / 560);
+          S.walkT = 0;
+        }
+      }
+    } else if (S.state === 'walking') {
+      S.walkT += dt;
+      var k = Math.min(1, S.walkT / S.walkDur);
+      S.heroX = S.walkFrom + (S.walkTo - S.walkFrom) * k;
+      if (k >= 1) {
+        if (S.pendingOK) {
+          S.idx++;
+          var cur = S.pillars[S.idx];
+          S.heroX = cur.x + cur.w * 0.42;
+          S.heroY = pillarTop(cur);
+          S.state = 'ready';
+          S.bridgeLen = 0;
+          S.charge = 0;
+          // 走钢丝：10 分后每 3 根触发
+          S.wire = S.score >= 10 && (S.score % 3 === 0);
+          ensurePillars();
+          setTip(S.wire ? '走钢丝！倒挂通过可得奖励' : '按住屏幕蓄力 · 松手搭桥');
+          if (S.bigScore !== true && S.score >= 10) { S.bigScore = true; }
+        } else {
+          S.state = 'dying';
+          S.fallV = 60;
+          SFX.hit();
+          vib([14, 40, 22]);
+        }
+      }
+    } else if (S.state === 'dying') {
+      S.fallV += 1500 * dt;
+      S.heroY += S.fallV * dt;
+      S.heroRot += dt * 3.4;
+      if (S.heroY > H + 120) gameOver();
+    }
+
+    // 相机
+    var targetCam = S.heroX - W * 0.28;
+    if (S.state === 'ready' || S.state === 'charging') {
+      S.camX += (targetCam - S.camX) * Math.min(1, dt * 5.2);
+    }
+  }
+
+  function ensurePillars() {
+    var lastP = S.pillars[S.pillars.length - 1];
+    while (S.idx + 5 > S.pillars.length - 1) {
+      var p = newPillar(lastP.x + lastP.w + gapFor(S.score), lastP.top);
+      S.pillars.push(p);
+      lastP = p;
+    }
+  }
+
+  var comboTO = null;
+  function showCombo(txt) {
+    elCombo.textContent = txt;
+    elCombo.style.opacity = 1;
+    elCombo.style.transform = 'translateY(0) scale(1)';
+    elCombo.animate([{ transform: 'translateY(10px) scale(.86)', opacity: 0 },
+                     { transform: 'translateY(0) scale(1.06)', opacity: 1 },
+                     { transform: 'translateY(-4px) scale(1)', opacity: 1 }],
+                    { duration: 420, easing: 'ease-out' });
+    clearTimeout(comboTO);
+    comboTO = setTimeout(function () { elCombo.style.opacity = 0; }, 480);
+  }
+
+  function gameOver() {
+    S.state = 'dead';
+    SFX.over();
+    var nb = Math.max(S.best, S.score);
+    if (nb > S.best) { S.best = nb; saveBest(nb); }
+    updateHud();
+    elTitle.textContent = S.score >= 10 ? '走钢丝大师' : '掉下去了';
+    elSub.innerHTML = '本局 <b style="color:#ffd76e">' + S.score + '</b> 分 · PERFECT ' + S.perfects +
+      ' 次<br>最高分 ' + S.best;
+    elBig.textContent = S.score;
+    elBig.className = 'show';
+    btnStart.textContent = '再来一局';
+    buildHeroPicker();
+    elOv.classList.add('show');
+  }
+
+  // ---------- 绘制 ----------
+  function stageOf(score) {
+    if (score >= 32) return 3;
+    if (score >= 20) return 2;
+    if (score >= 10) return 1;
+    return 0;
+  }
+
+  function draw() {
+    var st = SKY[stageOf(S.score)];
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, st.a); g.addColorStop(0.55, st.b); g.addColorStop(1, st.c);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    drawStars(st);
+    drawSun(st);
+    drawMountains(st);
+    drawPillars(st);
+    drawHero(st);
+    drawChargeBar();
+  }
+
+  function drawStars(st) {
+    if (!st.star) return;
+    var sc = S.camX * 0.02;
+    ctx.save();
+    for (var i = 0; i < 46; i++) {
+      var sx = ((i * 137.5 + sc * 40) % (W + 60)) - 30;
+      var sy = ((i * 71.3) % (H * 0.5));
+      var a = 0.25 + 0.5 * Math.abs(Math.sin(i * 1.7 + S.t * 0.8));
+      ctx.globalAlpha = a; ctx.fillStyle = '#dfe9ff';
+      ctx.beginPath(); ctx.arc(sx, sy, i % 5 === 0 ? 1.6 : 1, 0, 6.2832); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawSun(st) {
+    var cx = W * 0.74, cy = H * 0.24;
+    ctx.save();
+    var rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.34);
+    if (st.moon) {
+      rg.addColorStop(0, 'rgba(190,215,255,.72)');
+      rg.addColorStop(0.16, 'rgba(150,185,255,.2)');
+      rg.addColorStop(1, 'rgba(120,160,255,0)');
+    } else {
+      rg.addColorStop(0, 'rgba(255,236,180,.95)');
+      rg.addColorStop(0.2, 'rgba(255,196,110,.28)');
+      rg.addColorStop(1, 'rgba(255,170,90,0)');
+    }
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(cx, cy, W * 0.34, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = st.moon ? 'rgba(226,238,255,.92)' : 'rgba(255,247,214,.95)';
+    ctx.beginPath(); ctx.arc(cx, cy, st.moon ? 26 : 34, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawMountains(st) {
+    var base = GROUND;
+    for (var layer = 0; layer < 3; layer++) {
+      var par = 0.12 + layer * 0.16;
+      var off = (S.camX * par) % 520;
+      var hgt = (0.12 + layer * 0.07) * H;
+      var alpha = 0.16 + layer * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(-60, base);
+      for (var x = -60; x <= W + 60; x += 24) {
+        var wx = x + off;
+        var y = base - hgt * (0.5 + 0.5 * Math.sin(wx / (150 + layer * 46) + layer * 1.7))
+                    - hgt * 0.28 * Math.sin(wx / 72);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W + 60, base); ctx.closePath();
+      ctx.fillStyle = 'rgba(4,9,24,' + alpha.toFixed(2) + ')';
+      ctx.fill();
+    }
+  }
+
+  function drawPillars(st) {
+    for (var i = 0; i < S.pillars.length; i++) {
+      var p = S.pillars[i];
+      var sx = p.x - S.camX;
+      if (sx > W + 240 || sx + p.w < -240) continue;
+      var top = pillarTop(p);
+      var ph = GROUND - top;
+
+      // 柱体
+      var pg = ctx.createLinearGradient(sx, 0, sx + p.w, 0);
+      pg.addColorStop(0, '#1c3a6b');
+      pg.addColorStop(0.42, '#2a5590');
+      pg.addColorStop(1, '#122a4e');
+      ctx.fillStyle = pg;
+      roundRect(sx, top, p.w, ph + 60, 5, 5, 0, 0);
+      ctx.fill();
+
+      // 柱顶受光
+      ctx.fillStyle = 'rgba(180,215,255,.55)';
+      roundRect(sx, top, p.w, 6, 5, 5, 0, 0);
+      ctx.fill();
+
+      // 纹理
+      ctx.strokeStyle = 'rgba(255,255,255,.055)';
+      ctx.lineWidth = 1;
+      for (var t = top + 18; t < GROUND; t += 22) {
+        ctx.beginPath(); ctx.moveTo(sx + 4, t); ctx.lineTo(sx + p.w - 4, t); ctx.stroke();
+      }
+
+      // 中心 Perfect 区提示
+      if (i === S.idx + 1 && S.state === 'ready') {
+        var ctr = p.x + p.w / 2 - S.camX;
+        ctx.save();
+        ctx.globalAlpha = 0.32 + 0.16 * Math.sin(S.t * 3.4);
+        ctx.fillStyle = '#ffd76e';
+        ctx.fillRect(ctr - p.w * 0.17, top + 3, p.w * 0.34, 4);
+        ctx.restore();
+      }
+
+      // 已搭的桥
+      if (p.bridge > 0) drawBridge(sx + p.w, top + 2, p.bridge, 1);
+    }
+  }
+
+  function drawBridge(x, y, len, prog) {
+    var L = len * prog;
+    ctx.save();
+    var bg = ctx.createLinearGradient(x, y, x, y + 12);
+    bg.addColorStop(0, '#c98a4b');
+    bg.addColorStop(0.5, '#a96b34');
+    bg.addColorStop(1, '#7d4a1f');
+    ctx.fillStyle = bg;
+    roundRect(x, y, L, 11, 3, 3, 0, 0);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(60,32,8,.5)';
+    ctx.lineWidth = 1;
+    for (var bx = x + 10; bx < x + L - 4; bx += 16) {
+      ctx.beginPath(); ctx.moveTo(bx, y + 1); ctx.lineTo(bx, y + 10); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawHero(st) {
+    var sx = S.heroX - S.camX;
+    var sy = S.heroY;
+    var wire = S.wire && S.state !== 'dead';
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(S.heroRot);
+    if (wire && S.state !== 'dying') ctx.scale(1, -1);   // 倒挂
+
+    var skin = S.hero;
+    ctx.fillStyle = '#0d1424';
+    ctx.strokeStyle = 'rgba(140,190,255,.4)';
+    ctx.lineWidth = 1.2;
+
+    if (skin === 0) {           // 行者
+      // 腿
+      var swing = Math.sin(S.t * 9) * (S.state === 'walking' ? 5 : 1.2);
+      ctx.beginPath();
+      ctx.moveTo(-3, -10); ctx.lineTo(-4 - swing, 1); ctx.lineTo(-8 - swing, 1);
+      ctx.lineTo(-8 - swing, 3); ctx.lineTo(-1, 3); ctx.lineTo(-1, -10); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(3, -10); ctx.lineTo(4 + swing, 1); ctx.lineTo(0 + swing, 1);
+      ctx.lineTo(0 + swing, 3); ctx.lineTo(7, 3); ctx.lineTo(7, -10); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      // 身
+      ctx.beginPath(); roundRect(-7, -26, 14, 18, 5, 5, 0, 0); ctx.fill(); ctx.stroke();
+      // 头
+      ctx.beginPath(); ctx.arc(0, -33, 7.4, 0, 6.2832); ctx.fill(); ctx.stroke();
+    } else if (skin === 1) {    // 巫师
+      ctx.beginPath(); roundRect(-8, -26, 16, 20, 6, 6, 0, 0); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -33, 7, 0, 6.2832); ctx.fill(); ctx.stroke();
+      // 尖帽
+      ctx.beginPath();
+      ctx.moveTo(-11, -37); ctx.lineTo(0, -58); ctx.lineTo(11, -37); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-12, -37); ctx.lineTo(12, -37); ctx.lineTo(10, -34); ctx.lineTo(-10, -34); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    } else if (skin === 2) {    // 斗篷
+      ctx.beginPath();
+      ctx.moveTo(0, -40);
+      ctx.quadraticCurveTo(-14, -22, -13, 3);
+      ctx.quadraticCurveTo(0, 6, 13, 3);
+      ctx.quadraticCurveTo(14, -22, 0, -40);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -44, 6.4, 0, 6.2832); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(140,190,255,.24)';
+      ctx.beginPath(); ctx.moveTo(0, -34); ctx.lineTo(-7, -6); ctx.lineTo(7, -6); ctx.closePath(); ctx.fill();
+    } else {                    // 机甲
+      ctx.beginPath(); roundRect(-9, -27, 18, 19, 3, 3, 0, 0); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); roundRect(-6, -32, 12, 6, 2, 2, 0, 0); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); roundRect(-8, -42, 16, 11, 3, 3, 0, 0); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -42); ctx.lineTo(0, -50); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -51.5, 2.4, 0, 6.2832);
+      ctx.fillStyle = '#7fd8ff'; ctx.fill();
+      ctx.fillStyle = 'rgba(120,220,255,.85)';
+      ctx.fillRect(-4.4, -38.4, 3.2, 2.4); ctx.fillRect(1.2, -38.4, 3.2, 2.4);
+      ctx.beginPath(); roundRect(-10, -9, 6, 9, 2, 2, 0, 0); ctx.fill();
+      ctx.beginPath(); roundRect(4, -9, 6, 9, 2, 2, 0, 0); ctx.fill();
+    }
+    ctx.restore();
+
+    // 桥延伸中
+    if (S.state === 'charging') {
+      var p = S.pillars[S.idx];
+      var px = p.x + p.w - S.camX;
+      drawBridge(px, pillarTop(p) + 2, S.bridgeLen, 1);
+    } else if (S.state === 'bridging') {
+      var p2 = S.pillars[S.idx];
+      var px2 = p2.x + p2.w - S.camX;
+      drawBridge(px2, pillarTop(p2) + 2, S.bridgeLen, S.bridgeGrow);
+    }
+  }
+
+  function drawChargeBar() {
+    if (S.state !== 'charging') return;
+    var w = W * 0.54, h = 7, x = (W - w) / 2, y = H - 78 - (safeTop ? 0 : 0);
+    y = H - 74;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    roundRect(x, y, w, h, 4, 4, 0, 0); ctx.fill();
+    var cg = ctx.createLinearGradient(x, y, x + w, y);
+    cg.addColorStop(0, '#5ad1ff'); cg.addColorStop(0.6, '#ffd76e'); cg.addColorStop(1, '#ff6b6b');
+    ctx.fillStyle = cg;
+    roundRect(x, y, w * S.charge, h, 4, 4, 0, 0); ctx.fill();
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, rtl, rtr, rbl, rbr) {
+    var top = rtl > 0 || rtr > 0, bot = rbl > 0 || rbr > 0;
+    ctx.beginPath();
+    if (top) {
+      ctx.moveTo(x + rtl, y);
+      ctx.lineTo(x + w - rtr, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + rtr);
+    } else {
+      ctx.moveTo(x, y); ctx.lineTo(x + w, y);
+    }
+    if (bot) {
+      ctx.lineTo(x + w, y + h - rbr);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - rbr, y + h);
+      ctx.lineTo(x + rbl, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - rbl);
+    } else {
+      ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h);
+    }
+    if (top) {
+      ctx.lineTo(x, y + rtl);
+      ctx.quadraticCurveTo(x, y, x + rtl, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  // ---------- 角色选择器 ----------
+  function buildHeroPicker() {
+    elHeroes.innerHTML = '';
+    var best = Math.max(S.best, S.score);
+    HEROES.forEach(function (h) {
+      var locked = best < h.need;
+      var d = document.createElement('div');
+      d.className = 'hero' + (S.hero === h.id ? ' on' : '') + (locked ? ' lock' : '');
+      var c = document.createElement('canvas');
+      c.width = 76; c.height = 92;
+      drawHeroIcon(c.getContext('2d'), h.id);
+      d.appendChild(c);
+      if (locked) {
+        var lk = document.createElement('div');
+        lk.className = 'lk';
+        lk.textContent = h.need + '分解锁';
+        d.appendChild(lk);
+      }
+      d.addEventListener('pointerup', function (ev) {
+        ev.preventDefault();
+        if (locked) { SFX.hit(); vib(20); return; }
+        S.hero = h.id;
+        try { localStorage.setItem(LS_HERO, String(h.id)); } catch (e) {}
+        SFX.click();
+        buildHeroPicker();
+      });
+      elHeroes.appendChild(d);
+    });
+  }
+
+  function drawHeroIcon(c, id) {
+    c.save();
+    c.translate(38, 74);
+    c.fillStyle = '#dfe9ff';
+    c.strokeStyle = 'rgba(120,180,255,.55)';
+    c.lineWidth = 1.4;
+    if (id === 0) {
+      c.beginPath(); c.roundRect ? c.roundRect(-7, -26, 14, 18, 5) : c.rect(-7, -26, 14, 18); c.fill(); c.stroke();
+      c.beginPath(); c.arc(0, -33, 7.4, 0, 6.2832); c.fill(); c.stroke();
+      c.beginPath(); c.rect(-6, -8, 4, 9); c.rect(2, -8, 4, 9); c.fill();
+    } else if (id === 1) {
+      c.beginPath(); c.roundRect ? c.roundRect(-8, -26, 16, 20, 6) : c.rect(-8, -26, 16, 20); c.fill(); c.stroke();
+      c.beginPath(); c.arc(0, -33, 7, 0, 6.2832); c.fill(); c.stroke();
+      c.beginPath(); c.moveTo(-11, -37); c.lineTo(0, -58); c.lineTo(11, -37); c.closePath(); c.fill(); c.stroke();
+    } else if (id === 2) {
+      c.beginPath();
+      c.moveTo(0, -40); c.quadraticCurveTo(-14, -22, -13, 3);
+      c.quadraticCurveTo(0, 6, 13, 3); c.quadraticCurveTo(14, -22, 0, -40);
+      c.closePath(); c.fill(); c.stroke();
+      c.beginPath(); c.arc(0, -44, 6.4, 0, 6.2832); c.fill(); c.stroke();
+    } else {
+      c.beginPath(); c.roundRect ? c.roundRect(-9, -27, 18, 19, 3) : c.rect(-9, -27, 18, 19); c.fill(); c.stroke();
+      c.beginPath(); c.roundRect ? c.roundRect(-8, -42, 16, 11, 3) : c.rect(-8, -42, 16, 11); c.fill(); c.stroke();
+      c.beginPath(); c.moveTo(0, -42); c.lineTo(0, -50); c.stroke();
+      c.beginPath(); c.arc(0, -51.5, 2.4, 0, 6.2832); c.fillStyle = '#7fd8ff'; c.fill();
+      c.fillStyle = '#dfe9ff';
+      c.beginPath(); c.rect(-10, -9, 6, 9); c.rect(4, -9, 6, 9); c.fill();
+    }
+    c.restore();
+  }
+
+  // ---------- 启动 ----------
+  btnStart.addEventListener('click', function () {
+    elOv.classList.remove('show');
+    elBig.className = '';
+    btnStart.textContent = '开始';
+    reset();
+    ensurePillars();
+    SFX.click();
+  });
+
+  resize();
+  reset();
+  ensurePillars();
+  buildHeroPicker();
+  elBig.className = '';
+  btnStart.textContent = '开始';
+  elOv.classList.add('show');
+  elTitle.textContent = '撑杆走钢丝';
+  elSub.innerHTML = '按住蓄力，松手落桥<br>桥搭在柱心「双倍分」';
+  requestAnimationFrame(loop);
+
+  if (window.Juice && window.Juice.init) Juice.init({ game: 'stick' });
+
+  // 调试接口
+  window.__Stick = {
+    S: function () { return S; },
+    release: releaseCharge,
+    start: startCharge,
+    reset: reset
+  };
+})();
+</script>
+</body>
+</html>

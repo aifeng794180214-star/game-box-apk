@@ -264,7 +264,7 @@
     invuln: 0, rushT: 0, deadT: 0, started: false,
     speed: 210, spawnT: 0, passedFirst: false, hue: 0
   };
-  var G = 1780, FLAP = -560;
+  var G = 1520, FLAP = -470;
 
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -309,15 +309,17 @@
     return clamp(g, 118 * SF, 300 * SF);
   }
 
-  function spawnPipe() {
-    var gap = gapSize();
+  function spawnPipe(easy) {
+    var gap = gapSize() * (easy ? 1.28 : 1);
+    gap = Math.min(gap, H * 0.42);
     var marginTop = safeTop() + 78 * SF;
     var marginBot = 26 * SF;
     var minY = marginTop + gap / 2 + 20;
     var maxY = H - marginBot - gap / 2 - 20;
     if (maxY < minY) maxY = minY;
     var prev = S.pipes.length ? S.pipes[S.pipes.length - 1].gy : (minY + maxY) / 2;
-    var gy = clamp(prev + rnd(-H * 0.19, H * 0.19), minY, maxY);
+    var gy = easy ? clamp(H * 0.44 - gap / 2, minY, maxY)
+                  : clamp(prev + rnd(-H * 0.19, H * 0.19), minY, maxY);
     var p = {
       x: W + 70 * SF, w: clamp(64 * SF, 46, 82), gy: gy, gap: gap,
       hue: (S.hue = (S.hue + 47) % 360), scored: false, dead: false,
@@ -412,8 +414,9 @@
     S.pipes = []; S.spawnT = 0;
     S.bird.y = H * 0.46; S.bird.vy = 0; S.bird.rot = 0;
     S.started = true; S.bird.vy = FLAP * 0.62;
-    spawnPipe();
-    S.pipes[0].x = W * 0.92;
+    spawnPipe(true);
+    if (S.pipes[0]) S.pipes[0].x = W + 40 * SF;
+    S.spawnT = (232 * SF) / S.speed;
   }
 
   /* ---------------- 更新 ---------------- */
@@ -440,6 +443,7 @@
       S.bird.vy += G * dt * 0.9;
       S.bird.y += S.bird.vy * dt;
       S.bird.rot = clamp(S.bird.vy / 900, -0.6, 1.5);
+      if (S.bird.y > H - S.bird.r) { S.bird.y = H - S.bird.r; S.bird.vy = 0; S.bird.rot = 1.45; }
       if (S.tScale < 1) S.tScale = clamp(S.tScale + dt * 0.7, 0.22, 1);
       return;
     }
@@ -516,7 +520,7 @@
 
         // 碰撞
         if (!pp.dead && S.invuln <= 0) {
-          var bx = S.bird.x, by = S.bird.y, br = S.bird.r * 0.82;
+          var bx = S.bird.x, by = S.bird.y, br = S.bird.r * 0.66;
           if (bx + br > pp.x && bx - br < pp.x + pp.w) {
             if (by - br < pp.gy || by + br > pp.gy + pp.gap) {
               if (S.rushT > 0) {
