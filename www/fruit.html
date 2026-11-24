@@ -1,0 +1,2678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#120c08">
+<title>水果忍者 · Fruit Ninja</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#120c08;}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+    color:#f6ead8;touch-action:none;user-select:none;-webkit-user-select:none;
+    overscroll-behavior:none;-webkit-font-smoothing:antialiased;
+  }
+  #game{display:block;position:fixed;inset:0;touch-action:none;cursor:crosshair;}
+
+  /* ============ HUD ============ */
+  #hud{
+    position:fixed;inset:0;z-index:5;pointer-events:none;
+    padding:calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 14px calc(16px + env(safe-area-inset-left));
+    display:flex;justify-content:space-between;align-items:flex-start;
+  }
+  /* 首页 / 结算面板打开时隐藏 HUD，避免分数与红心透在毛玻璃后面 */
+  #hud.hide{opacity:0;transition:opacity .2s;}
+  .hud-left{display:flex;flex-direction:column;gap:2px;}
+  .score-label{
+    font-size:11px;letter-spacing:3px;color:#c8a86a;text-transform:uppercase;
+    text-shadow:0 1px 3px rgba(0,0,0,.9);
+  }
+  .score-val{
+    font-size:44px;line-height:1.05;font-weight:800;font-variant-numeric:tabular-nums;
+    color:#fff3d6;text-shadow:0 0 18px rgba(242,193,78,.55),0 3px 8px rgba(0,0,0,.8);
+    transition:transform .12s ease-out;
+  }
+  .score-val.pop{transform:scale(1.16);}
+  .best-row{font-size:12px;color:#a99475;letter-spacing:1px;text-shadow:0 1px 3px #000;}
+  .best-row b{color:#f2c14e;font-variant-numeric:tabular-nums;}
+  .hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  .hearts{display:flex;gap:4px;font-size:24px;line-height:1;}
+  .heart{
+    color:#ff3b52;text-shadow:0 0 14px rgba(255,59,82,.8),0 2px 4px rgba(0,0,0,.7);
+    transition:all .3s cubic-bezier(.3,1.6,.5,1);display:inline-block;
+  }
+  .heart{position:relative;}
+  .heart.lost{color:#c8364a;text-shadow:0 0 6px rgba(120,0,10,.5);opacity:.32;}
+  .heart.lost::after{
+    content:'✕';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    color:#ff2f48;font-size:.78em;font-weight:900;
+    text-shadow:0 0 10px rgba(255,47,72,.95),0 0 3px #000;
+  }
+  .right-btns{display:flex;align-items:center;gap:8px;}
+  .timer{
+    font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px;
+    padding:5px 11px;border-radius:999px;
+    background:rgba(20,13,8,.62);border:1px solid rgba(242,193,78,.35);
+    color:#f2c14e;text-shadow:0 0 10px rgba(242,193,78,.5);display:none;
+  }
+  .timer.on{display:block;}
+  .timer.warn{color:#ff6b6b;border-color:rgba(255,107,107,.6);animation:pulse .8s infinite;}
+  @keyframes pulse{50%{opacity:.45;}}
+  .icon-btn{
+    pointer-events:auto;cursor:pointer;
+    width:38px;height:38px;border-radius:12px;
+    background:rgba(24,16,10,.72);border:1px solid rgba(242,193,78,.28);
+    color:#f0dcb8;font-size:15px;font-weight:700;font-family:inherit;
+    display:grid;place-items:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:.18s;line-height:1;
+  }
+  .icon-btn:hover{background:rgba(52,36,22,.9);border-color:rgba(242,193,78,.6);transform:translateY(-1px);}
+  .icon-btn:active{transform:scale(.94);}
+  .icon-btn.muted{color:#7b6a58;border-color:rgba(120,100,80,.35);}
+
+  /* ============ 弹层通用 ============ */
+  .overlay{
+    position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+    padding:18px;
+    background:radial-gradient(ellipse at 50% 35%,rgba(60,40,22,.55),rgba(8,5,3,.9) 70%);
+    backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+    opacity:1;transition:opacity .3s;
+  }
+  .overlay.hidden{opacity:0;pointer-events:none;}
+  .panel{
+    width:min(94vw,440px);max-height:94vh;overflow-y:auto;
+    padding:26px 24px 22px;border-radius:24px;
+    background:linear-gradient(165deg,rgba(46,32,21,.97),rgba(20,13,8,.99));
+    border:1px solid rgba(242,193,78,.32);
+    box-shadow:0 40px 90px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.09),0 0 60px rgba(242,193,78,.08);
+    animation:popIn .32s cubic-bezier(.2,.95,.35,1.15);
+    text-align:center;
+  }
+  @keyframes popIn{from{opacity:0;transform:translateY(16px) scale(.94);}to{opacity:1;transform:none;}}
+  .panel{scrollbar-width:thin;scrollbar-color:rgba(242,193,78,.35) transparent;}
+  .panel::-webkit-scrollbar{width:6px;}
+  .panel::-webkit-scrollbar-track{background:transparent;}
+  .panel::-webkit-scrollbar-thumb{background:rgba(242,193,78,.3);border-radius:6px;}
+  /* 矮屏（笔记本矮窗口 / 手机横屏）：压缩首页留白，保证开始按钮不被挤出、不出现滚动条 */
+  @media (max-height:560px){
+    .panel{padding:15px 18px 13px;border-radius:20px;}
+    .title{font-size:29px;letter-spacing:4px;}
+    .title-en{font-size:9px;letter-spacing:5px;margin-top:3px;}
+    .sub{font-size:11px;margin:6px 0 10px;}
+    .section-title{margin:9px 0 6px;font-size:10px;}
+    .mode-card{padding:9px 10px;gap:3px;}
+    .mode-name{font-size:13px;}
+    .mode-desc{font-size:9.5px;}
+    .blade-card{padding:7px 5px;gap:5px;font-size:10px;}
+    .blade-dot{width:22px;height:7px;}
+    .start-btn{margin-top:10px;padding:11px;font-size:15px;letter-spacing:3px;}
+    .section-title{margin:7px 0 5px;}
+    /* 极矮窗口优先保证按钮完整可见：操作提示改为隐藏 */
+    .hint{display:none;}
+  }
+  .title{
+    font-size:38px;font-weight:900;letter-spacing:6px;line-height:1.15;
+    background:linear-gradient(180deg,#fff6d8,#f2c14e 55%,#b8812a);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 10px rgba(242,193,78,.35));
+  }
+  .title-en{display:block;font-size:11px;letter-spacing:7px;font-weight:600;color:#9c8462;margin-top:6px;text-transform:uppercase;}
+  .sub{font-size:12.5px;color:#a89478;margin:10px 0 18px;letter-spacing:1.5px;}
+  .section-title{
+    text-align:left;font-size:11px;letter-spacing:3px;color:#c8a86a;
+    margin:16px 0 8px;padding-left:4px;text-transform:uppercase;
+  }
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .blades{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .mode-card,.blade-card{
+    cursor:pointer;font-family:inherit;color:#e8d9c4;text-align:left;
+    background:rgba(255,255,255,.035);border:1px solid rgba(242,193,78,.16);
+    border-radius:14px;padding:12px 12px;transition:.18s;display:flex;flex-direction:column;gap:5px;
+  }
+  .mode-card:hover,.blade-card:hover{background:rgba(242,193,78,.1);border-color:rgba(242,193,78,.4);}
+  .mode-card.active,.blade-card.active{
+    background:linear-gradient(160deg,rgba(242,193,78,.22),rgba(242,193,78,.06));
+    border-color:#f2c14e;box-shadow:0 0 0 1px rgba(242,193,78,.35),0 8px 24px rgba(242,193,78,.16);
+  }
+  .mode-name{font-size:14px;font-weight:800;letter-spacing:1px;}
+  .mode-desc{font-size:10.5px;color:#9c8a70;line-height:1.4;}
+  .blade-card{align-items:center;text-align:center;padding:10px 6px;font-size:11px;font-weight:700;gap:7px;}
+  .blade-dot{width:26px;height:9px;border-radius:99px;display:block;}
+  .bd0{background:linear-gradient(90deg,rgba(255,255,255,.1),#fff,rgba(255,255,255,.1));box-shadow:0 0 12px rgba(255,255,255,.85);}
+  .bd1{background:linear-gradient(90deg,rgba(255,80,40,.1),#ff7a2f,#ffd24a);box-shadow:0 0 12px rgba(255,110,40,.9);}
+  .bd2{background:linear-gradient(90deg,rgba(60,200,255,.1),#5ce1ff,#c9f7ff);box-shadow:0 0 12px rgba(92,225,255,.9);}
+  .start-btn{
+    cursor:pointer;font-family:inherit;width:100%;margin-top:20px;padding:15px;
+    font-size:17px;font-weight:900;letter-spacing:4px;border:none;border-radius:16px;
+    color:#2a1a06;background:linear-gradient(180deg,#ffe9a8,#f2c14e 45%,#d0952b);
+    box-shadow:0 10px 26px rgba(242,193,78,.32),inset 0 1px 0 rgba(255,255,255,.7);
+    transition:.16s;
+  }
+  .start-btn:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(242,193,78,.45),inset 0 1px 0 rgba(255,255,255,.7);}
+  .start-btn:active{transform:scale(.975);}
+  .ghost-btn{
+    cursor:pointer;font-family:inherit;width:100%;margin-top:10px;padding:11px;
+    font-size:13px;font-weight:700;letter-spacing:2px;border-radius:14px;
+    color:#b8a488;background:transparent;border:1px solid rgba(242,193,78,.22);transition:.16s;
+  }
+  .ghost-btn:hover{color:#f2c14e;border-color:rgba(242,193,78,.55);}
+  .hint{font-size:10.5px;color:#7d6b56;margin-top:14px;letter-spacing:.5px;line-height:1.6;}
+  .result-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:11px 14px;margin-top:9px;border-radius:13px;
+    background:rgba(255,255,255,.04);font-size:13px;color:#a89478;letter-spacing:1px;
+  }
+  .result-row b{font-size:21px;color:#ffe9b0;font-variant-numeric:tabular-nums;}
+  .extra{margin-top:12px;font-size:12px;color:#c8a86a;letter-spacing:1px;line-height:1.7;min-height:0;}
+  .over-title{
+    font-size:26px;font-weight:900;letter-spacing:5px;
+    background:linear-gradient(180deg,#fff3d0,#f2c14e 60%,#b8812a);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  @media (max-width:380px){
+    .title{font-size:31px;letter-spacing:4px;}
+    .score-val{font-size:36px;}
+    .panel{padding:22px 18px 18px;}
+  }
+  @media (max-width:480px){
+    /* 窄屏：模式卡改单列，避免文案挤成两行断字 */
+    .modes{grid-template-columns:1fr;}
+    .mode-desc{font-size:11px;}
+    .panel{padding:24px 16px 20px;max-width:92vw;}
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hide">
+  <div class="hud-left">
+    <div class="score-label" data-i18n="score">得分</div>
+    <div id="scoreVal" class="score-val">0</div>
+    <div class="best-row"><span data-i18n="best">最高</span> <b id="bestVal">0</b></div>
+  </div>
+  <div class="hud-right">
+    <div id="hearts" class="hearts"></div>
+    <div class="right-btns">
+      <div id="timer" class="timer">90</div>
+      <button id="btnLang" class="icon-btn" title="切换语言 / Language">EN</button>
+      <button id="btnMute" class="icon-btn" title="静音 / Mute">🔊</button>
+    </div>
+  </div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <div class="title" data-i18n="title">水果忍者</div>
+    <span class="title-en">Fruit Ninja</span>
+    <p class="sub" data-i18n="subtitle">挥刀斩果 · 一刀多杀 · 汁水四溅</p>
+
+    <div class="section-title" data-i18n="modeTitle">选择模式</div>
+    <div class="modes">
+      <button class="mode-card active" data-mode="classic">
+        <span class="mode-name" data-i18n="classic">经典模式</span>
+        <span class="mode-desc" data-i18n="classicDesc">3 颗红心 · 切到炸弹即结束</span>
+      </button>
+      <button class="mode-card" data-mode="zen">
+        <span class="mode-name" data-i18n="zen">禅宗模式</span>
+        <span class="mode-desc" data-i18n="zenDesc">90 秒倒计时 · 无炸弹尽情切</span>
+      </button>
+    </div>
+
+    <div class="section-title" data-i18n="bladeTitle">刀刃皮肤</div>
+    <div class="blades">
+      <button class="blade-card active" data-blade="0"><span class="blade-dot bd0"></span><span data-i18n="blade0">经典白刃</span></button>
+      <button class="blade-card" data-blade="1"><span class="blade-dot bd1"></span><span data-i18n="blade1">烈焰红莲</span></button>
+      <button class="blade-card" data-blade="2"><span class="blade-dot bd2"></span><span data-i18n="blade2">冰霜极光</span></button>
+    </div>
+
+    <button id="btnStart" class="start-btn" data-i18n="start">开 始 游 戏</button>
+    <p class="hint" data-i18n="hint">按住鼠标左键滑动 / 手指划屏切水果<br>一刀划过 3 个以上水果触发疯狂连击</p>
+  </div>
+</div>
+
+<div id="over" class="overlay hidden">
+  <div class="panel">
+    <div id="overTitle" class="over-title">游戏结束</div>
+    <div class="result-row"><span data-i18n="finalScore">本局得分</span><b id="overScore">0</b></div>
+    <div class="result-row"><span data-i18n="best">最高纪录</span><b id="overBest">0</b></div>
+    <div id="overExtra" class="extra"></div>
+    <button id="btnAgain" class="start-btn" data-i18n="again">再 来 一 局</button>
+    <button id="btnHome" class="ghost-btn" data-i18n="home">返回首页</button>
+  </div>
+</div>
+
+<script src="juice.js"></script>
+<script>
+(function () {
+  'use strict';
+/* ============================================================
+   0. 基础工具
+   ============================================================ */
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const rndInt = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* ============================================================
+   1. 画布 & 自适应
+   ============================================================ */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { alpha: false });
+let W = 0, H = 0, DPR = 1, SCALE = 1;
+
+const bgCanvas = document.createElement('canvas');
+const bgCtx = bgCanvas.getContext('2d');
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(1, window.innerWidth);
+  H = Math.max(1, window.innerHeight);
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // 全屏等比缩放系数：以 760px 短边为基准
+  // 面积开方缩放：横屏/竖屏的手机与电脑都能得到视觉一致的果子大小
+  SCALE = clamp(Math.sqrt(W * H) / 760, 0.62, 1.45);
+  buildBackground();
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+/* ============================================================
+   2. 深色日式木纹 + 竹席背景（一次性离屏预渲染，运行时零开销）
+   ============================================================ */
+function buildBackground() {
+  bgCanvas.width = Math.floor(W * DPR);
+  bgCanvas.height = Math.floor(H * DPR);
+  bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  bgCtx.clearRect(0, 0, W, H);
+
+  // 2.1 底色暖木渐变
+  const base = bgCtx.createLinearGradient(0, 0, W * 0.25, H);
+  base.addColorStop(0, '#2b1e13');
+  base.addColorStop(0.35, '#3a2818');
+  base.addColorStop(0.72, '#241a11');
+  base.addColorStop(1, '#160f0a');
+  bgCtx.fillStyle = base;
+  bgCtx.fillRect(0, 0, W, H);
+
+  // 2.2 横向木板条 + 木纹曲线
+  const plankH = Math.max(64, H / 8.5);
+  for (let y = -plankH; y < H + plankH; y += plankH) {
+    const tone = rnd(-0.05, 0.055);
+    bgCtx.save();
+    bgCtx.fillStyle = 'rgba(' + ((62 + tone * 420) | 0) + ',' + ((43 + tone * 300) | 0) + ',' + ((27 + tone * 200) | 0) + ',0.5)';
+    bgCtx.fillRect(0, y, W, plankH - 2);
+
+    // 木纹：多条随机起伏的曲线
+    for (let i = 0; i < 26; i++) {
+      bgCtx.beginPath();
+      let px = -30, py = y + rnd(3, plankH - 3);
+      bgCtx.moveTo(px, py);
+      while (px < W + 30) {
+        px += rnd(38, 96);
+        py = clamp(py + rnd(-3.4, 3.4), y + 2, y + plankH - 4);
+        bgCtx.lineTo(px, py);
+      }
+      bgCtx.strokeStyle = 'rgba(0,0,0,' + rnd(0.03, 0.11).toFixed(3) + ')';
+      bgCtx.lineWidth = rnd(0.6, 2.3);
+      bgCtx.stroke();
+    }
+    // 木节
+    if (Math.random() < 0.5) {
+      const kx = rnd(0, W), ky = y + rnd(12, plankH - 12), kr = rnd(3, 8);
+      for (let k = 0; k < 4; k++) {
+        bgCtx.beginPath();
+        bgCtx.ellipse(kx, ky, kr + k * 3.4, (kr + k * 3.4) * 0.35, rnd(-0.3, 0.3), 0, TAU);
+        bgCtx.strokeStyle = 'rgba(0,0,0,0.09)';
+        bgCtx.lineWidth = 1;
+        bgCtx.stroke();
+      }
+    }
+    // 板缝高光与阴影
+    bgCtx.fillStyle = 'rgba(0,0,0,0.42)';
+    bgCtx.fillRect(0, y + plankH - 3, W, 3);
+    bgCtx.fillStyle = 'rgba(255,214,158,0.045)';
+    bgCtx.fillRect(0, y, W, 1.6);
+    bgCtx.restore();
+  }
+
+  // 2.3 竹席编织层（竖向细竹片 + 交错横纹）
+  const matW = Math.max(24, W / 30);
+  for (let x = 0; x < W; x += matW) {
+    const idx = Math.round(x / matW);
+    bgCtx.fillStyle = idx % 2 === 0 ? 'rgba(150,108,60,0.055)' : 'rgba(0,0,0,0.07)';
+    bgCtx.fillRect(x, 0, matW - 1, H);
+    bgCtx.fillStyle = 'rgba(255,220,170,0.035)';
+    bgCtx.fillRect(x, 0, 1.4, H);
+  }
+  bgCtx.strokeStyle = 'rgba(0,0,0,0.09)';
+  bgCtx.lineWidth = 1;
+  for (let y = 0; y < H; y += 9) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(0, y);
+    bgCtx.lineTo(W, y);
+    bgCtx.stroke();
+  }
+
+  // 2.4 暖色光晕（右上角灯光感）
+  const lamp = bgCtx.createRadialGradient(W * 0.82, H * 0.08, 10, W * 0.82, H * 0.08, Math.max(W, H) * 0.75);
+  lamp.addColorStop(0, 'rgba(255,196,110,0.16)');
+  lamp.addColorStop(0.42, 'rgba(255,160,70,0.05)');
+  lamp.addColorStop(1, 'rgba(0,0,0,0)');
+  bgCtx.fillStyle = lamp;
+  bgCtx.fillRect(0, 0, W, H);
+
+  // 2.5 四周暗角
+  const vg = bgCtx.createRadialGradient(W / 2, H * 0.46, Math.min(W, H) * 0.18, W / 2, H * 0.5, Math.max(W, H) * 0.8);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(0.72, 'rgba(0,0,0,0.3)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.72)');
+  bgCtx.fillStyle = vg;
+  bgCtx.fillRect(0, 0, W, H);
+}
+
+/* ============================================================
+   3. Web Audio API 纯代码合成音效
+   ============================================================ */
+const SFX = (function () {
+  let ac = null, master = null, noiseBuf = null, muted = false;
+
+  function ensure() {
+    if (!ac) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      master = ac.createGain();
+      master.gain.value = 0.55;
+      master.connect(ac.destination);
+    }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function noise() {
+    if (!noiseBuf) {
+      const len = Math.floor(ac.sampleRate * 1.2);
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
+  }
+  function gainNode(t0, peak, attack, decay) {
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
+    return g;
+  }
+
+  // 挥刀 "咻"
+  function swipe() {
+    const c = ensure(); if (!c || muted) return;
+    const t = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noise();
+    src.playbackRate.value = rnd(1.3, 1.8);
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(rnd(2000, 2900), t);
+    bp.frequency.exponentialRampToValueAtTime(rnd(500, 800), t + 0.17);
+    const g = gainNode(t, 0.1, 0.012, 0.16);
+    src.connect(bp).connect(g).connect(master);
+    src.start(t); src.stop(t + 0.24);
+  }
+
+  // 切果 "咔嚓"
+  function slice() {
+    const c = ensure(); if (!c || muted) return;
+    const t = c.currentTime;
+    // 高频脆裂
+    const src = c.createBufferSource(); src.buffer = noise();
+    src.playbackRate.value = rnd(2.0, 2.8);
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = rnd(1500, 2400);
+    const g1 = gainNode(t, 0.2, 0.004, 0.085);
+    src.connect(hp).connect(g1).connect(master);
+    src.start(t); src.stop(t + 0.13);
+    // 低频闷响，制造厚度
+    const osc = c.createOscillator(); osc.type = 'triangle';
+    osc.frequency.setValueAtTime(rnd(360, 470), t);
+    osc.frequency.exponentialRampToValueAtTime(95, t + 0.13);
+    const g2 = gainNode(t, 0.16, 0.005, 0.12);
+    osc.connect(g2).connect(master);
+    osc.start(t); osc.stop(t + 0.16);
+    // 汁水飞溅的小水滴
+    for (let i = 0; i < 2; i++) {
+      const o2 = c.createOscillator(); o2.type = 'sine';
+      const st = t + 0.03 + i * 0.035;
+      o2.frequency.setValueAtTime(rnd(1100, 1700), st);
+      o2.frequency.exponentialRampToValueAtTime(rnd(500, 800), st + 0.07);
+      const g3 = gainNode(st, 0.055, 0.004, 0.075);
+      o2.connect(g3).connect(master);
+      o2.start(st); o2.stop(st + 0.1);
+    }
+  }
+
+  // 连击升调（三连音上行）
+  function combo(level) {
+    const c = ensure(); if (!c || muted) return;
+    const t0 = c.currentTime;
+    const base = 620 * Math.pow(1.06, Math.min(level, 10));
+    const steps = [0, 4, 7, 12];
+    steps.forEach((semi, i) => {
+      const t = t0 + i * 0.052;
+      const o = c.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(base * Math.pow(2, semi / 12), t);
+      const g = gainNode(t, 0.11, 0.006, 0.19);
+      o.connect(g).connect(master);
+      o.start(t); o.stop(t + 0.26);
+    });
+  }
+
+  // 炸弹轰鸣
+  function boom() {
+    const c = ensure(); if (!c || muted) return;
+    const t = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noise();
+    src.playbackRate.value = 0.7;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(2400, t);
+    lp.frequency.exponentialRampToValueAtTime(120, t + 0.9);
+    const g = gainNode(t, 0.75, 0.008, 1.0);
+    src.connect(lp).connect(g).connect(master);
+    src.start(t); src.stop(t + 1.15);
+    // 次低音冲击
+    const o = c.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(32, t + 0.8);
+    const g2 = gainNode(t, 0.6, 0.01, 0.85);
+    o.connect(g2).connect(master);
+    o.start(t); o.stop(t + 0.95);
+  }
+
+  // 狂热石榴：亮闪闪的琶音
+  function frenzy() {
+    const c = ensure(); if (!c || muted) return;
+    const t0 = c.currentTime;
+    [0, 5, 7, 12, 16, 19, 24].forEach((s, i) => {
+      const t = t0 + i * 0.045;
+      const o = c.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(880 * Math.pow(2, s / 12), t);
+      const g = gainNode(t, 0.09, 0.005, 0.16);
+      o.connect(g).connect(master);
+      o.start(t); o.stop(t + 0.22);
+    });
+  }
+
+  // 漏果 / 失血
+  function miss() {
+    const c = ensure(); if (!c || muted) return;
+    const t = c.currentTime;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(240, t);
+    o.frequency.exponentialRampToValueAtTime(80, t + 0.28);
+    const g = gainNode(t, 0.13, 0.01, 0.3);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + 0.34);
+  }
+
+  return {
+    unlock: ensure,
+    swipe, slice, combo, boom, frenzy, miss,
+    setMuted(v) { muted = v; if (master) master.gain.value = v ? 0 : 0.55; },
+    get muted() { return muted; }
+  };
+})();
+
+/* ============================================================
+   4. 特效系统：汁水粒子 / 果汁印 / 浮动文字 / 红叉 / 冲击波
+   ============================================================ */
+const particles = [];   // 汁水与火花粒子
+const splats = [];      // 背景板上的果汁印记
+const floats = [];      // 浮动得分文字
+const marks = [];       // 漏果红叉
+const shocks = [];      // 冲击波圆环
+
+function spawnJuice(x, y, color, count, dirX, dirY) {
+  for (let i = 0; i < count; i++) {
+    if (particles.length > 900) break;
+    const ang = dirX !== undefined ? Math.atan2(dirY, dirX) + rnd(-1.15, 1.15) : rnd(0, TAU);
+    const sp = rnd(120, 620) * SCALE;
+    particles.push({
+      x: x + rnd(-6, 6), y: y + rnd(-6, 6),
+      vx: Math.cos(ang) * sp,
+      vy: Math.sin(ang) * sp - rnd(30, 160),
+      r: rnd(2, 7.5) * SCALE,
+      life: rnd(0.45, 1.05), max: 1.05,
+      color,
+      g: rnd(900, 1500) * SCALE,
+      kind: 'juice'
+    });
+  }
+  // 少量细小雾滴
+  for (let i = 0; i < Math.max(3, count * 0.35); i++) {
+    if (particles.length > 1000) break;
+    const ang = rnd(0, TAU), sp = rnd(200, 780) * SCALE;
+    particles.push({
+      x, y,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+      r: rnd(0.8, 2.4) * SCALE,
+      life: rnd(0.25, 0.6), max: 0.6,
+      color, g: rnd(600, 1100) * SCALE, kind: 'mist'
+    });
+  }
+}
+
+function spawnSparks(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    if (particles.length > 1000) break;
+    const ang = rnd(0, TAU), sp = rnd(80, 460) * SCALE;
+    particles.push({
+      x, y,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 60,
+      r: rnd(1, 3) * SCALE,
+      life: rnd(0.3, 0.85), max: 0.85,
+      color: pick(['#ffd166', '#ff8b3d', '#ff5722', '#fff3b0']),
+      g: 260 * SCALE, kind: 'spark'
+    });
+  }
+}
+
+function addSplat(x, y, color, r) {
+  if (splats.length > 48) splats.shift();
+  // 中心汁团
+  const lobes = [];
+  for (let i = 0, n = rndInt(3, 5); i < n; i++) {
+    const a = rnd(0, TAU), d = rnd(r * 0.14, r * 0.52);
+    lobes.push({
+      dx: Math.cos(a) * d, dy: Math.sin(a) * d,
+      r: rnd(r * 0.34, r * 0.54),
+      sq: rnd(0.7, 1), rot: rnd(0, TAU)
+    });
+  }
+  // 放射状飞溅条纹：高速甩出的汁水拉丝
+  const streaks = [];
+  for (let i = 0, n = rndInt(4, 7); i < n; i++) {
+    const a = rnd(0, TAU);
+    streaks.push({
+      a, len: rnd(r * 1.2, r * 2.1), w: rnd(r * 0.06, r * 0.13),
+      off: rnd(-0.28, 0.28)
+    });
+  }
+  // 外围飞沫
+  const drops = [];
+  for (let i = 0, m = rndInt(8, 14); i < m; i++) {
+    const a = rnd(0, TAU), d = rnd(r * 1.1, r * 2.7);
+    drops.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d, r: rnd(r * 0.04, r * 0.11) });
+  }
+  splats.push({ x, y, r, color, lobes, streaks, drops, life: 1, max: 1, seed: rnd(0, TAU) });
+}
+
+function addFloat(x, y, text, color, size) {
+  floats.push({ x, y, text, color, size: size || 26, life: 1.1, max: 1.1, vy: -95 * SCALE });
+  return floats.length - 1;
+}
+
+function addMark(x, y) {
+  marks.push({ x, y, life: 1, max: 1 });
+}
+
+function addShock(x, y, color, radius) {
+  shocks.push({ x, y, r: 6 * SCALE, max: (radius || 90) * SCALE, life: 1, color });
+}
+
+function updateFx(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += p.g * dt;
+    p.vx *= (1 - 1.1 * dt);
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+  for (let i = splats.length - 1; i >= 0; i--) {
+    splats[i].life -= dt / 5.5;      // 印记缓慢淡去（约 5.5 秒）
+    if (splats[i].life <= 0) splats.splice(i, 1);
+  }
+  for (let i = floats.length - 1; i >= 0; i--) {
+    const f = floats[i];
+    f.life -= dt;
+    f.y += f.vy * dt;
+    f.vy *= (1 - 1.6 * dt);
+    if (f.life <= 0) floats.splice(i, 1);
+  }
+  for (let i = marks.length - 1; i >= 0; i--) {
+    marks[i].life -= dt / 1.1;
+    if (marks[i].life <= 0) marks.splice(i, 1);
+  }
+  for (let i = shocks.length - 1; i >= 0; i--) {
+    const s = shocks[i];
+    s.life -= dt * 2.6;
+    s.r = lerp(s.r, s.max, 1 - Math.pow(0.001, dt));
+    if (s.life <= 0) shocks.splice(i, 1);
+  }
+}
+
+function drawSplats(g) {
+  // 木纹板上残留的果汁印记：柔和汁水晕染 + 短飞溅 + 湿光，随时间缓缓淡去（不遮木纹）
+  for (const s of splats) {
+    const life = clamp(s.life, 0, 1);
+    const a = 0.20 * Math.pow(life, 1.25);
+    if (a < 0.004) continue;
+    g.save();
+    g.translate(s.x, s.y);
+
+    // 1) 主汁团：多团不规则椭圆叠成的水渍
+    g.globalAlpha = a;
+    g.fillStyle = s.color;
+    g.beginPath();
+    g.ellipse(0, 0, s.r * 0.58, s.r * 0.50, s.seed, 0, TAU);
+    g.fill();
+    // 每团汁水单独成路径：多条 ellipse 挤在同一路径里会产生跨屏细线（退化边抗锯齿）
+    for (const b of s.lobes) {
+      g.beginPath();
+      g.ellipse(b.dx, b.dy, b.r, b.r * b.sq, b.rot, 0, TAU);
+      g.fill();
+    }
+
+    // 2) 贴着汁团的短飞溅：两头收窄的水滴形，比直线更自然
+    g.globalAlpha = a * 0.5;
+    g.fillStyle = s.color;
+    for (const k of s.streaks) {
+      g.save();
+      g.rotate(k.a);
+      // k.len 是像素长度（r*1.2~2.1）：只从汁团边缘往外拉出 40%，避免跨屏长线
+      const x1 = s.r * 0.40 + k.off * s.r * 0.10;
+      const x2 = x1 + k.len * 0.40;
+      const w = Math.max(1.4, k.w * 1.1);
+      const mx = x1 + (x2 - x1) * 0.55;
+      g.beginPath();
+      g.moveTo(x1, -w * 0.5);
+      g.quadraticCurveTo(mx, -w * 0.34, x2, 0);
+      g.quadraticCurveTo(mx, w * 0.34, x1, w * 0.5);
+      g.closePath();
+      g.fill();
+      g.restore();
+    }
+
+    // 3) 湿润反光：一条细长高光
+    g.globalAlpha = a * 0.55;
+    g.fillStyle = 'rgba(255,255,255,0.42)';
+    g.beginPath();
+    g.ellipse(-s.r * 0.15, -s.r * 0.14, s.r * 0.13, s.r * 0.055, s.seed - 0.4, 0, TAU);
+    g.fill();
+
+    // 4) 外围飞沫
+    g.globalAlpha = a * 0.85;
+    g.fillStyle = s.color;
+    for (const d of s.drops) {
+      g.beginPath();
+      g.arc(d.dx, d.dy, d.r, 0, TAU);
+      g.fill();
+    }
+    g.restore();
+  }
+}
+
+function drawParticles(g) {
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  for (const p of particles) {
+    const t = clamp(p.life / p.max, 0, 1);
+    g.globalAlpha = p.kind === 'mist' ? t * 0.5 : t;
+    g.fillStyle = p.color;
+    g.beginPath();
+    g.arc(p.x, p.y, p.r * (0.32 + t * 0.75), 0, TAU);
+    g.fill();
+  }
+  g.restore();
+}
+
+function drawShocks(g) {
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  for (const s of shocks) {
+    g.globalAlpha = clamp(s.life, 0, 1) * 0.55;
+    g.strokeStyle = s.color;
+    g.lineWidth = 3 * SCALE * clamp(s.life, 0.1, 1);
+    g.beginPath();
+    g.arc(s.x, s.y, s.r, 0, TAU);
+    g.stroke();
+  }
+  g.restore();
+}
+
+function drawFloats(g) {
+  g.save();
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  for (const f of floats) {
+    const t = clamp(f.life / f.max, 0, 1);
+    const s = f.size * (0.7 + (1 - t) * 0.5);
+    g.globalAlpha = Math.min(1, t * 1.6);
+    g.font = '900 ' + (s | 0) + 'px "PingFang SC","Microsoft YaHei",system-ui,sans-serif';
+    g.lineWidth = s * 0.22;
+    g.strokeStyle = 'rgba(28,14,4,0.85)';
+    g.strokeText(f.text, f.x, f.y);
+    g.fillStyle = f.color;
+    g.shadowColor = f.color;
+    g.shadowBlur = 22;
+    g.fillText(f.text, f.x, f.y);
+    g.shadowBlur = 0;
+  }
+  g.restore();
+}
+
+function drawMarks(g) {
+  // 漏掉水果：屏幕底缘对应位置出现红色叉号
+  g.save();
+  g.lineCap = 'round';
+  for (const m of marks) {
+    const t = clamp(m.life, 0, 1);
+    const sz = 15 * SCALE;
+    g.globalAlpha = t * 0.95;
+    g.strokeStyle = '#ff3b52';
+    g.shadowColor = '#ff2038';
+    g.shadowBlur = 22;
+    g.lineWidth = 5 * SCALE;
+    g.beginPath();
+    g.moveTo(m.x - sz, m.y - sz); g.lineTo(m.x + sz, m.y + sz);
+    g.moveTo(m.x + sz, m.y - sz); g.lineTo(m.x - sz, m.y + sz);
+    g.stroke();
+  }
+  g.restore();
+}
+
+/* ============================================================
+   5. 刀光（Blade Trail）：两头尖、中间宽的渐变光剑
+   ============================================================ */
+const BLADES = [
+  { core: '#ffffff', mid: '#dcefff', glow: 'rgba(190,225,255,0.9)', wide: 30 },  // 经典白刃
+  { core: '#fff6d8', mid: '#ff8b34', glow: 'rgba(255,96,32,0.95)', wide: 32 },     // 烈焰红莲
+  { core: '#f2ffff', mid: '#5ce1ff', glow: 'rgba(90,215,255,0.95)', wide: 31 }     // 冰霜极光
+];
+let bladeIndex = 0;
+const TRAIL_LIFE = 0.25;      // 刀光 0.25 秒自然衰减
+const trail = [];             // {x, y, t}
+
+function drawBlade(g) {
+  const now = performance.now() / 1000;
+  while (trail.length && now - trail[0].t > TRAIL_LIFE) trail.shift();
+  if (trail.length < 2) return;
+
+  const skin = BLADES[bladeIndex];
+  const pts = trail;
+  const n = pts.length;
+  const maxW = skin.wide * SCALE;
+
+  // 逐点计算左右法线偏移（用相邻点求切线方向）
+  const L = [], R = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len; dy /= len;
+    const t = i / (n - 1);
+    // 中间宽两头尖的宽度曲线
+    const w = maxW * Math.pow(Math.sin(Math.PI * t), 0.62);
+    L.push({ x: p.x - dy * w, y: p.y + dx * w });
+    R.push({ x: p.x + dy * w, y: p.y - dx * w });
+  }
+
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+
+  // 5.1 外层大范围光晕
+  for (let i = 0; i < n - 1; i++) {
+    const t = i / (n - 1);
+    const age = (now - pts[i].t) / TRAIL_LIFE;
+    const a = (1 - age) * t * 0.5;
+    if (a <= 0.004) continue;
+    g.globalAlpha = a;
+    g.fillStyle = skin.glow;
+    g.beginPath();
+    g.moveTo(L[i].x, L[i].y);
+    g.lineTo(R[i].x, R[i].y);
+    g.lineTo(R[i + 1].x, R[i + 1].y);
+    g.lineTo(L[i + 1].x, L[i + 1].y);
+    g.closePath();
+    g.fill();
+  }
+
+  // 5.2 中层彩色刀身
+  for (let i = 0; i < n - 1; i++) {
+    const t = i / (n - 1);
+    const age = (now - pts[i].t) / TRAIL_LIFE;
+    const a = (1 - age) * t * 0.95;
+    if (a <= 0.01) continue;
+    g.globalAlpha = a;
+    g.fillStyle = skin.mid;
+    g.beginPath();
+    g.moveTo(lerp(pts[i].x, L[i].x, 0.62), lerp(pts[i].y, L[i].y, 0.62));
+    g.lineTo(lerp(pts[i].x, R[i].x, 0.62), lerp(pts[i].y, R[i].y, 0.62));
+    g.lineTo(lerp(pts[i + 1].x, R[i + 1].x, 0.62), lerp(pts[i + 1].y, R[i + 1].y, 0.62));
+    g.lineTo(lerp(pts[i + 1].x, L[i + 1].x, 0.62), lerp(pts[i + 1].y, L[i + 1].y, 0.62));
+    g.closePath();
+    g.fill();
+  }
+
+  // 5.3 内核高光刀刃（白芯）
+  for (let i = 0; i < n - 1; i++) {
+    const t = i / (n - 1);
+    const age = (now - pts[i].t) / TRAIL_LIFE;
+    const a = (1 - age) * t;
+    if (a <= 0.01) continue;
+    g.globalAlpha = a;
+    g.strokeStyle = skin.core;
+    g.shadowColor = skin.mid;
+    g.shadowBlur = 16 * SCALE;      // 白芯外的柔光，刀刃看起来在发光
+    g.lineWidth = maxW * 0.34 * Math.pow(Math.sin(Math.PI * t), 0.5);
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(pts[i].x, pts[i].y);
+    g.lineTo(pts[i + 1].x, pts[i + 1].y);
+    g.stroke();
+  }
+  g.restore();
+}
+
+/* ============================================================
+   6. 线段 × 圆 碰撞检测（高速划切零漏判的核心）
+   ------------------------------------------------------------
+   判断「上一帧指针位置 → 当前帧指针位置」构成的线段
+   与水果圆心 (cx,cy) 半径 r 的圆是否相交。
+   做法：把圆心投影到线段上取最近点，比较距离。
+   这样即使一帧内指针跨过整屏，也不会漏掉中间的水果。
+   ============================================================ */
+function segHitsCircle(x1, y1, x2, y2, cx, cy, r) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = 0;
+  if (lenSq > 0.000001) {
+    t = ((cx - x1) * dx + (cy - y1) * dy) / lenSq;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+  }
+  const px = x1 + dx * t, py = y1 + dy * t;
+  const ddx = cx - px, ddy = cy - py;
+  return ddx * ddx + ddy * ddy <= r * r;
+}
+/* ============================================================
+   7. 水果数据 & 纯 Canvas 手绘水果库（整果 + 切开半果截面）
+   ------------------------------------------------------------
+   每种水果：整果外观 + 切开后的半果截面（果皮 / 果肉 / 籽核细节）
+   ============================================================ */
+const FRUIT_DATA = {
+  watermelon:  { r: 58, juice: '#ef3b52', name: '西瓜' },
+  orange:      { r: 46, juice: '#ff9d2e', name: '橙子' },
+  apple:       { r: 46, juice: '#e63946', name: '苹果' },
+  banana:      { r: 50, juice: '#ffe08a', name: '香蕉' },
+  pineapple:   { r: 52, juice: '#ffd24a', name: '菠萝' },
+  strawberry:  { r: 43, juice: '#ff4d5e', name: '草莓' },
+  dragonfruit: { r: 50, juice: '#ff5c8a', name: '火龙果' },
+  pomegranate: { r: 52, juice: '#ffcf4d', name: '石榴' }
+};
+const FRUIT_TYPES = ['watermelon', 'orange', 'apple', 'banana', 'pineapple', 'strawberry', 'dragonfruit'];
+
+// 稳定伪随机（同一颗水果每帧纹理一致，不会闪烁）
+function h1(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+
+// 半圆路径：切面沿 x 轴，果体位于下半平面（y>0）
+function halfPath(g, r) {
+  g.beginPath();
+  g.moveTo(r, 0);
+  g.arc(0, 0, r, 0, Math.PI, false);
+  g.closePath();
+}
+
+/* ---------------- 整果 ---------------- */
+function drawWholeFruit(g, type, r, time) {
+  switch (type) {
+
+    /* —— 西瓜：绿皮深色条纹 —— */
+    case 'watermelon': {
+      const grd = g.createRadialGradient(-r * 0.35, -r * 0.42, r * 0.1, 0, 0, r * 1.1);
+      grd.addColorStop(0, '#8ed06c');
+      grd.addColorStop(0.45, '#4e9c3d');
+      grd.addColorStop(1, '#1b4a1f');
+      g.beginPath(); g.ellipse(0, 0, r, r * 0.95, 0, 0, TAU); g.fillStyle = grd; g.fill();
+      g.save();
+      g.beginPath(); g.ellipse(0, 0, r, r * 0.95, 0, 0, TAU); g.clip();
+      g.strokeStyle = 'rgba(18,56,20,0.7)';
+      g.lineWidth = r * 0.13; g.lineCap = 'round';
+      for (let i = -2; i <= 2; i++) {
+        const x = i * r * 0.42;
+        g.beginPath();
+        g.moveTo(x - r * 0.1, -r * 1.1);
+        g.bezierCurveTo(x + r * 0.2, -r * 0.4, x - r * 0.2, r * 0.4, x - r * 0.1, r * 1.1);
+        g.stroke();
+      }
+      g.globalAlpha = 0.1;
+      g.fillStyle = '#dff2a8';
+      for (let i = 0; i < 14; i++) {
+        g.beginPath();
+        g.ellipse((h1(i) - 0.5) * r * 1.7, (h1(i + 40) - 0.5) * r * 1.7, r * 0.09, r * 0.18, h1(i) * 3, 0, TAU);
+        g.fill();
+      }
+      g.restore();
+      g.beginPath();
+      g.ellipse(-r * 0.4, -r * 0.44, r * 0.27, r * 0.14, -0.75, 0, TAU);
+      g.fillStyle = 'rgba(255,255,255,0.3)'; g.fill();
+      break;
+    }
+
+    /* —— 橙子：橙色果皮 + 表皮凹凸 —— */
+    case 'orange': {
+      const grd = g.createRadialGradient(-r * 0.32, -r * 0.38, r * 0.1, 0, 0, r * 1.08);
+      grd.addColorStop(0, '#ffc25c');
+      grd.addColorStop(0.5, '#ff9f1c');
+      grd.addColorStop(1, '#c25c05');
+      g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fillStyle = grd; g.fill();
+      g.save();
+      g.beginPath(); g.arc(0, 0, r, 0, TAU); g.clip();
+      g.fillStyle = 'rgba(160,70,0,0.16)';
+      for (let i = 0; i < 46; i++) {
+        const a = h1(i) * TAU, d = Math.sqrt(h1(i + 7)) * r * 0.95;
+        g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, r * (0.016 + h1(i + 3) * 0.02), 0, TAU); g.fill();
+      }
+      g.restore();
+      g.beginPath();
+      g.ellipse(-r * 0.36, -r * 0.42, r * 0.28, r * 0.15, -0.7, 0, TAU);
+      g.fillStyle = 'rgba(255,255,255,0.34)'; g.fill();
+      // 小蒂
+      g.beginPath(); g.arc(0, -r * 0.97, r * 0.11, 0, TAU);
+      g.fillStyle = '#6d8a2a'; g.fill();
+      break;
+    }
+
+    /* —— 苹果：红皮纵纹 + 绿叶 —— */
+    case 'apple': {
+      const grd = g.createRadialGradient(-r * 0.34, -r * 0.4, r * 0.08, 0, 0, r * 1.12);
+      grd.addColorStop(0, '#ff7a72');
+      grd.addColorStop(0.42, '#e0362f');
+      grd.addColorStop(1, '#8e1218');
+      g.beginPath();
+      g.moveTo(0, -r * 0.86);
+      g.bezierCurveTo(r * 0.62, -r * 1.04, r * 1.04, -r * 0.42, r * 0.94, r * 0.14);
+      g.bezierCurveTo(r * 0.84, r * 0.8, r * 0.38, r * 1.02, 0, r * 0.98);
+      g.bezierCurveTo(-r * 0.38, r * 1.02, -r * 0.84, r * 0.8, -r * 0.94, r * 0.14);
+      g.bezierCurveTo(-r * 1.04, -r * 0.42, -r * 0.62, -r * 1.04, 0, -r * 0.86);
+      g.closePath();
+      g.fillStyle = grd; g.fill();
+      g.save(); g.clip();
+      g.strokeStyle = 'rgba(120,16,20,0.32)'; g.lineWidth = r * 0.06;
+      for (let i = -2; i <= 2; i++) {
+        g.beginPath();
+        g.moveTo(i * r * 0.35, -r * 1.05);
+        g.quadraticCurveTo(i * r * 0.5, 0, i * r * 0.3, r * 1.05);
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(255,220,210,0.22)';
+      g.beginPath(); g.ellipse(-r * 0.36, -r * 0.36, r * 0.24, r * 0.32, -0.5, 0, TAU); g.fill();
+      g.restore();
+      // 果梗 + 绿叶
+      g.strokeStyle = '#6b3f18'; g.lineWidth = r * 0.09; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(0, -r * 0.95); g.quadraticCurveTo(r * 0.06, -r * 1.22, r * 0.14, -r * 1.3); g.stroke();
+      g.beginPath();
+      g.ellipse(r * 0.42, -r * 1.16, r * 0.3, r * 0.14, -0.5, 0, TAU);
+      const lg = g.createLinearGradient(r * 0.2, -r * 1.3, r * 0.7, -r * 1.0);
+      lg.addColorStop(0, '#8fd44a'); lg.addColorStop(1, '#2f7a2a');
+      g.fillStyle = lg; g.fill();
+      g.beginPath();
+      g.ellipse(-r * 0.05, -r * 1.05, r * 0.12, r * 0.16, 0.2, 0, TAU);
+      g.fillStyle = 'rgba(90,20,20,0.45)'; g.fill();
+      break;
+    }
+
+    /* —— 香蕉：弯月黄皮 —— */
+    case 'banana': {
+      // 用两段贝塞尔勾出饱满的弯月蕉身（两端尖、中段厚）
+      g.beginPath();
+      g.moveTo(-r * 1.08, -r * 0.14);
+      g.bezierCurveTo(-r * 0.72, r * 0.98, r * 0.72, r * 0.98, r * 1.08, -r * 0.14);
+      g.bezierCurveTo(r * 0.80, r * 0.26, -r * 0.80, r * 0.26, -r * 1.08, -r * 0.14);
+      g.closePath();
+      const grd = g.createLinearGradient(-r * 0.5, r * 0.9, r * 0.3, -r * 0.3);
+      grd.addColorStop(0, '#b8860c');
+      grd.addColorStop(0.28, '#e8bc22');
+      grd.addColorStop(0.6, '#f9d94a');
+      grd.addColorStop(0.85, '#fff0a0');
+      grd.addColorStop(1, '#f2cf3e');
+      g.fillStyle = grd; g.fill();
+      g.save(); g.clip();
+      // 棱线：香蕉的三棱分面
+      g.strokeStyle = 'rgba(146,100,8,0.28)'; g.lineWidth = r * 0.05;
+      for (let i = 1; i <= 3; i++) {
+        const k = i / 4;
+        g.beginPath();
+        g.moveTo(-r * 1.05, -r * 0.10);
+        g.bezierCurveTo(-r * (0.72 - k * 0.1), r * (0.98 - k * 0.22), r * (0.72 - k * 0.1), r * (0.98 - k * 0.22), r * 1.05, -r * 0.10);
+        g.stroke();
+      }
+      // 下缘阴影，凸显圆柱体积
+      g.strokeStyle = 'rgba(120,80,4,0.34)'; g.lineWidth = r * 0.2;
+      g.beginPath();
+      g.moveTo(-r * 0.9, r * 0.34);
+      g.bezierCurveTo(-r * 0.5, r * 0.9, r * 0.5, r * 0.9, r * 0.9, r * 0.34);
+      g.stroke();
+      // 上缘高光
+      g.strokeStyle = 'rgba(255,255,255,0.42)'; g.lineWidth = r * 0.11;
+      g.beginPath();
+      g.moveTo(-r * 0.78, r * 0.10);
+      g.bezierCurveTo(-r * 0.4, r * 0.36, r * 0.4, r * 0.36, r * 0.78, r * 0.10);
+      g.stroke();
+      g.restore();
+      // 两端褐色蕉蒂
+      g.fillStyle = '#4e3a0c';
+      g.beginPath(); g.ellipse(-r * 1.06, -r * 0.14, r * 0.09, r * 0.16, -0.5, 0, TAU); g.fill();
+      g.beginPath(); g.ellipse(r * 1.06, -r * 0.14, r * 0.09, r * 0.16, 0.5, 0, TAU); g.fill();
+      break;
+    }
+
+    /* —— 菠萝：金黄菱格 + 绿叶冠 —— */
+    case 'pineapple': {
+      // 叶冠
+      for (let i = -3; i <= 3; i++) {
+        g.save();
+        g.rotate(i * 0.22);
+        const lg = g.createLinearGradient(0, -r * 1.0, 0, -r * 1.9);
+        lg.addColorStop(0, '#2f7a2a'); lg.addColorStop(1, '#8fd44a');
+        g.beginPath();
+        g.moveTo(-r * 0.13, -r * 0.9);
+        g.quadraticCurveTo(i * r * 0.06, -r * 1.6, 0, -r * (1.5 + Math.abs(i) * 0.11));
+        g.quadraticCurveTo(r * 0.13, -r * 1.5, r * 0.13, -r * 0.9);
+        g.closePath();
+        g.fillStyle = lg; g.fill();
+        g.restore();
+      }
+      // 果身
+      const grd = g.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.05);
+      grd.addColorStop(0, '#ffd24f');
+      grd.addColorStop(0.45, '#e5a01a');
+      grd.addColorStop(0.8, '#b4690a');
+      grd.addColorStop(1, '#7d4605');
+      g.beginPath(); g.ellipse(0, r * 0.1, r * 0.85, r * 1.0, 0, 0, TAU); g.fillStyle = grd; g.fill();
+      g.save();
+      g.beginPath(); g.ellipse(0, r * 0.1, r * 0.85, r * 1.0, 0, 0, TAU); g.clip();
+      // 菱形果目纹理：先压一道暗缝，再在左上补一道亮边，做出浮雕般的凸起感
+      for (let pass = 0; pass < 2; pass++) {
+        g.strokeStyle = pass ? 'rgba(255,214,126,0.40)' : 'rgba(88,52,4,0.52)';
+        g.lineWidth = r * (pass ? 0.028 : 0.045);
+        const off = pass ? r * 0.012 : 0;
+        for (let i = -4; i <= 4; i++) {
+          g.beginPath(); g.moveTo(-r + i * r * 0.4 + off, -r * 1.1); g.lineTo(r + i * r * 0.4 + off, r * 1.25); g.stroke();
+          g.beginPath(); g.moveTo(-r + i * r * 0.4 + off, r * 1.25); g.lineTo(r + i * r * 0.4 + off, -r * 1.1); g.stroke();
+        }
+      }
+      // 每个菱形中心的小刺点
+      g.fillStyle = 'rgba(120,78,10,0.5)';
+      for (let i = -3; i <= 3; i++) {
+        for (let j = 0; j < 6; j++) {
+          const cx = i * r * 0.4 + (j % 2 ? r * 0.2 : 0);
+          const cy = -r * 0.95 + j * r * 0.36;
+          g.beginPath(); g.arc(cx, cy, r * 0.022, 0, TAU); g.fill();
+        }
+      }
+      // 右下角压一层暗调，避免整颗发白
+      const shade = g.createRadialGradient(-r * 0.34, -r * 0.36, r * 0.2, 0, r * 0.2, r * 1.15);
+      shade.addColorStop(0, 'rgba(255,255,255,0)');
+      shade.addColorStop(0.7, 'rgba(60,30,0,0.10)');
+      shade.addColorStop(1, 'rgba(40,20,0,0.34)');
+      g.fillStyle = shade; g.fillRect(-r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
+      g.fillStyle = 'rgba(255,235,160,0.12)';
+      for (let i = 0; i < 14; i++) {
+        const a = h1(i) * TAU, d = Math.sqrt(h1(i + 5)) * r * 0.8;
+        g.beginPath(); g.arc(Math.cos(a) * d, r * 0.1 + Math.sin(a) * d * 1.15, r * 0.05, 0, TAU); g.fill();
+      }
+      g.restore();
+      g.beginPath();
+      g.ellipse(-r * 0.34, -r * 0.30, r * 0.17, r * 0.075, -0.6, 0, TAU);
+      g.fillStyle = 'rgba(255,255,255,0.22)'; g.fill();
+      break;
+    }
+
+    /* —— 草莓：红皮白籽 + 绿萼 —— */
+    case 'strawberry': {
+      const grd = g.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.08, 0, 0, r * 1.15);
+      grd.addColorStop(0, '#ff6b6b');
+      grd.addColorStop(0.45, '#e0273f');
+      grd.addColorStop(1, '#8e0f24');
+      g.beginPath();
+      g.moveTo(0, r * 1.12);
+      g.bezierCurveTo(-r * 1.15, r * 0.2, -r * 1.0, -r * 0.98, 0, -r * 0.92);
+      g.bezierCurveTo(r * 1.0, -r * 0.98, r * 1.15, r * 0.2, 0, r * 1.12);
+      g.closePath();
+      g.fillStyle = grd; g.fill();
+      g.save(); g.clip();
+      // 籽（黄色小椭圆）
+      g.fillStyle = '#ffe9a8';
+      for (let i = 0; i < 26; i++) {
+        const a = h1(i) * TAU, d = Math.sqrt(h1(i + 11)) * r * 0.85;
+        const sx = Math.cos(a) * d, sy = Math.sin(a) * d;
+        g.beginPath(); g.ellipse(sx, sy, r * 0.045, r * 0.075, a, 0, TAU); g.fill();
+      }
+      g.fillStyle = 'rgba(255,255,255,0.16)';
+      g.beginPath(); g.ellipse(-r * 0.4, -r * 0.3, r * 0.2, r * 0.34, -0.4, 0, TAU); g.fill();
+      g.restore();
+      // 绿萼
+      g.save(); g.translate(0, -r * 0.9);
+      for (let i = -2; i <= 2; i++) {
+        g.save(); g.rotate(i * 0.45);
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.quadraticCurveTo(r * 0.2, -r * 0.26, 0, -r * 0.55);
+        g.quadraticCurveTo(-r * 0.2, -r * 0.26, 0, 0);
+        g.fillStyle = i % 2 === 0 ? '#4d9e34' : '#63b83f';
+        g.fill();
+        g.restore();
+      }
+      g.beginPath(); g.arc(0, 0, r * 0.09, 0, TAU); g.fillStyle = '#2f6b22'; g.fill();
+      g.restore();
+      break;
+    }
+
+    /* —— 火龙果：玫红皮 + 绿鳞 —— */
+    case 'dragonfruit': {
+      const grd = g.createRadialGradient(-r * 0.32, -r * 0.36, r * 0.1, 0, 0, r * 1.08);
+      grd.addColorStop(0, '#ff8ab0');
+      grd.addColorStop(0.45, '#e0366f');
+      grd.addColorStop(1, '#8d0f3d');
+      // 果身
+      g.beginPath(); g.ellipse(0, r * 0.06, r * 0.92, r * 0.98, 0, 0, TAU);
+      g.fillStyle = grd; g.fill();
+      g.save();
+      g.beginPath(); g.ellipse(0, r * 0.06, r * 0.92, r * 0.98, 0, 0, TAU); g.clip();
+      // 皮面浅色斑纹
+      g.fillStyle = 'rgba(255,220,235,0.18)';
+      for (let i = 0; i < 12; i++) {
+        const a = h1(i) * TAU, d = Math.sqrt(h1(i + 9)) * r * 0.8;
+        g.beginPath(); g.ellipse(Math.cos(a) * d, r * 0.06 + Math.sin(a) * d, r * 0.1, r * 0.05, a, 0, TAU); g.fill();
+      }
+      g.restore();
+
+      /* 绿鳞：叶片状鳞片沿果皮外翻，越靠顶端越短，形成火龙果标志性的鳞甲质感 */
+      const scale = (px, py, ang, len, wid, deep) => {
+        g.save();
+        g.translate(px, py); g.rotate(ang);
+        const lg = g.createLinearGradient(0, 0, 0, -len);
+        lg.addColorStop(0, deep ? '#a8194d' : '#c22460');
+        lg.addColorStop(0.34, deep ? '#c92a63' : '#e2497f');
+        lg.addColorStop(0.68, '#8fbf49');
+        lg.addColorStop(1, '#e6f7a2');
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.bezierCurveTo(wid, -len * 0.34, wid * 0.95, -len * 0.78, wid * 0.18, -len);
+        g.bezierCurveTo(-wid * 0.62, -len * 0.80, -wid, -len * 0.34, 0, 0);
+        g.fillStyle = lg; g.fill();
+        g.strokeStyle = 'rgba(92,14,42,0.30)';
+        g.lineWidth = Math.max(1, r * 0.016); g.stroke();
+        // 叶脉高光
+        g.beginPath();
+        g.moveTo(0, -len * 0.06);
+        g.quadraticCurveTo(wid * 0.2, -len * 0.55, wid * 0.1, -len * 0.88);
+        g.strokeStyle = 'rgba(255,240,250,0.28)';
+        g.lineWidth = Math.max(1, r * 0.012); g.stroke();
+        g.restore();
+      };
+      // 四排鳞片：贴着果皮层层外翻，越往上越短，形成火龙果标志性的鳞甲
+      const rows = [[-0.52, 0.50, 3], [0.02, 0.54, 3], [0.50, 0.42, 2]];
+      for (const [ry, len, cnt] of rows) {
+        for (let i = 0; i < cnt; i++) {
+          const t = cnt === 1 ? 0.5 : i / (cnt - 1);
+          const px = (-0.58 + t * 1.16) * r * (1 - Math.abs(ry) * 0.3);
+          const py = ry * r + r * 0.06;
+          // 鳞片朝外斜上方舒展：左侧向左翻，右侧向右翻
+          const ang = (t - 0.5) * 1.15 + (ry < 0 ? -0.10 : 0.14);
+          scale(px, py, ang, len * r, r * 0.19, Math.abs(ry) > 0.3);
+        }
+      }
+      g.beginPath();
+      g.ellipse(-r * 0.38, -r * 0.36, r * 0.24, r * 0.13, -0.7, 0, TAU);
+      g.fillStyle = 'rgba(255,255,255,0.3)'; g.fill();
+      break;
+    }
+
+    /* —— 黄金彩虹石榴（奖励水果，金橙果身 + 彩虹流光 + 宝冠 + 宝石籽） —— */
+    case 'pomegranate': {
+      const pulse = 0.5 + 0.5 * Math.sin(time * 4.2);
+
+      // 1) 外发光光环：让奖励水果一眼就被注意到
+      g.save();
+      g.shadowColor = 'rgba(255,206,74,' + (0.55 + pulse * 0.4).toFixed(2) + ')';
+      g.shadowBlur = r * (0.75 + pulse * 0.75);
+      const grd = g.createRadialGradient(-r * 0.34, -r * 0.42, r * 0.05, 0, 0, r * 1.02);
+      grd.addColorStop(0, '#fff2b6');
+      grd.addColorStop(0.2, '#ffc233');
+      grd.addColorStop(0.5, '#e8890c');
+      grd.addColorStop(0.78, '#a3540a');
+      grd.addColorStop(1, '#5c2f04');
+      g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fillStyle = grd; g.fill();
+      g.restore();
+
+      g.save();
+      g.beginPath(); g.arc(0, 0, r * 0.99, 0, TAU); g.clip();
+
+      // 2) 彩虹流光：三道斜向的柔光带缓慢流转，而不是硬邦邦的糖果条纹
+      g.globalCompositeOperation = 'overlay';
+      const cols = ['#ff4d64', '#ffb019', '#7dff5a', '#39d6ff', '#a86bff'];
+      for (let i = 0; i < cols.length; i++) {
+        const ph = time * 0.55 + i * 0.7;
+        const cx = Math.cos(ph) * r * 0.42;
+        const cy = Math.sin(ph) * r * 0.42;
+        const lg = g.createLinearGradient(cx - r * 0.7, cy - r * 0.7, cx + r * 0.7, cy + r * 0.7);
+        lg.addColorStop(0, 'rgba(255,255,255,0)');
+        lg.addColorStop(0.5, cols[i]);
+        lg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.globalAlpha = 0.75;
+        g.fillStyle = lg;
+        g.fillRect(-r, -r, r * 2, r * 2);
+      }
+      g.globalCompositeOperation = 'source-over';
+      g.globalAlpha = 1;
+
+      // 2.5) 果皮纵向明暗纹：石榴表皮的天然起伏
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * TAU + 0.3;
+        g.beginPath();
+        g.moveTo(Math.cos(a) * r * 0.18, Math.sin(a) * r * 0.18);
+        g.quadraticCurveTo(Math.cos(a + 0.22) * r * 0.66, Math.sin(a + 0.22) * r * 0.66,
+                           Math.cos(a) * r * 0.99, Math.sin(a) * r * 0.99);
+        g.strokeStyle = i % 2 ? 'rgba(120,58,4,0.16)' : 'rgba(255,206,110,0.14)';
+        g.lineWidth = r * 0.07;
+        g.stroke();
+      }
+
+      // 3) 果皮斑驳纹理：细密的暗金点，避免大色块显得廉价
+      for (let i = 0; i < 16; i++) {
+        const a = h1(i) * TAU, d = Math.sqrt(h1(i + 31)) * r * 0.92;
+        g.beginPath();
+        g.arc(Math.cos(a) * d, Math.sin(a) * d, r * (0.03 + h1(i + 7) * 0.03), 0, TAU);
+        g.fillStyle = 'rgba(140,74,10,0.16)';
+        g.fill();
+      }
+
+      // 4) 透出的宝石籽：半透明玫红小亮点，暗示里面是满籽石榴
+      for (let i = 0; i < 9; i++) {
+        const a = h1(i + 3) * TAU, d = Math.sqrt(h1(i + 17)) * r * 0.62;
+        g.beginPath();
+        g.ellipse(Math.cos(a) * d, Math.sin(a) * d, r * 0.085, r * 0.065, a, 0, TAU);
+        g.fillStyle = i % 2 ? 'rgba(150,18,52,0.32)' : 'rgba(214,60,96,0.26)';
+        g.fill();
+      }
+      g.restore();
+
+      // 5) 宝冠：外翻的五瓣花萼
+      g.save();
+      g.translate(0, -r * 0.82);
+      for (let i = 0; i < 5; i++) {
+        const t = (i - 2) / 2;
+        g.save();
+        g.rotate(t * 0.5);
+        const cg = g.createLinearGradient(0, 0, 0, -r * 0.42);
+        cg.addColorStop(0, '#a86a10');
+        cg.addColorStop(1, '#f0b93c');
+        g.beginPath();
+        g.moveTo(-r * 0.09, 0);
+        g.lineTo(r * 0.09, 0);
+        g.lineTo(r * 0.06, -r * 0.34);
+        g.lineTo(0, -r * 0.44);
+        g.lineTo(-r * 0.06, -r * 0.34);
+        g.closePath();
+        g.fillStyle = cg;
+        g.fill();
+        g.restore();
+      }
+      g.restore();
+
+      // 6) 柔和高光 + 星芒闪烁
+      const hl = g.createRadialGradient(-r * 0.38, -r * 0.42, 0, -r * 0.38, -r * 0.42, r * 0.34);
+      hl.addColorStop(0, 'rgba(255,255,235,0.5)');
+      hl.addColorStop(1, 'rgba(255,255,255,0)');
+      g.beginPath(); g.ellipse(-r * 0.38, -r * 0.42, r * 0.26, r * 0.17, -0.7, 0, TAU);
+      g.fillStyle = hl; g.fill();
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) {
+        const a = time * 1.4 + i * 2.1;
+        const sx = Math.cos(a) * r * 0.66, sy = Math.sin(a * 1.3) * r * 0.56;
+        const sp = r * (0.14 + 0.1 * Math.sin(time * 6 + i));
+        g.strokeStyle = 'rgba(255,255,240,0.85)';
+        g.lineWidth = Math.max(1, r * 0.03);
+        g.beginPath();
+        g.moveTo(sx - sp, sy); g.lineTo(sx + sp, sy);
+        g.moveTo(sx, sy - sp); g.lineTo(sx, sy + sp);
+        g.stroke();
+      }
+      g.restore();
+      break;
+    }
+  }
+}
+
+/* ---------------- 切开后的半果（果肉截面） ---------------- */
+function drawHalfFruit(g, type, r) {
+  switch (type) {
+
+    /* 西瓜：绿皮 + 白皮 + 红瓤黑籽 */
+    case 'watermelon': {
+      halfPath(g, r);
+      const grd = g.createRadialGradient(0, r * 0.1, r * 0.08, 0, r * 0.25, r);
+      grd.addColorStop(0, '#ff6a7a');
+      grd.addColorStop(0.5, '#ea3850');
+      grd.addColorStop(1, '#bb1f38');
+      g.fillStyle = grd; g.fill();
+      g.save(); halfPath(g, r); g.clip();
+      g.beginPath(); g.arc(0, 0, r * 0.9, 0, Math.PI, false);
+      g.strokeStyle = '#f2f9e0'; g.lineWidth = r * 0.1; g.stroke();
+      g.beginPath(); g.arc(0, 0, r * 0.965, 0, Math.PI, false);
+      g.strokeStyle = '#2f7a35'; g.lineWidth = r * 0.1; g.stroke();
+      // 籽
+      g.fillStyle = '#2a1210';
+      for (let i = 0; i < 9; i++) {
+        const a = Math.PI * (0.1 + 0.8 * (i / 8)) + (h1(i) - 0.5) * 0.16;
+        const d = r * (0.36 + 0.36 * h1(i + 20));
+        g.save();
+        g.translate(Math.cos(a) * d, Math.sin(a) * d);
+        g.rotate(a + Math.PI / 2);
+        g.beginPath(); g.ellipse(0, 0, r * 0.045, r * 0.075, 0, 0, TAU); g.fill();
+        g.restore();
+      }
+      // 切面水光
+      g.globalAlpha = 0.18;
+      g.fillStyle = '#fff';
+      g.beginPath(); g.ellipse(-r * 0.3, r * 0.3, r * 0.3, r * 0.12, -0.6, 0, TAU); g.fill();
+      g.restore();
+      // 切面边缘
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0);
+      g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1.6; g.stroke();
+      break;
+    }
+
+    /* 橙子：橙皮 + 白络 + 瓣状果肉 */
+    case 'orange': {
+      halfPath(g, r);
+      g.fillStyle = '#ffb347'; g.fill();
+      g.save(); halfPath(g, r); g.clip();
+      // 果瓣
+      for (let i = 0; i < 9; i++) {
+        const a0 = Math.PI * (i / 9) + 0.035;
+        const a1 = Math.PI * ((i + 1) / 9) - 0.035;
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.arc(0, 0, r * 0.8, a0, a1, false);
+        g.closePath();
+        const vg = g.createRadialGradient(0, 0, r * 0.08, 0, 0, r * 0.8);
+        vg.addColorStop(0, '#ffd88a');
+        vg.addColorStop(0.6, '#ffab2e');
+        vg.addColorStop(1, '#f08a12');
+        g.fillStyle = vg; g.fill();
+        g.strokeStyle = 'rgba(255,246,214,0.85)'; g.lineWidth = r * 0.035; g.stroke();
+      }
+      // 白络外圈 + 橙皮
+      g.beginPath(); g.arc(0, 0, r * 0.855, 0, Math.PI, false);
+      g.strokeStyle = '#fff6dc'; g.lineWidth = r * 0.07; g.stroke();
+      g.beginPath(); g.arc(0, 0, r * 0.945, 0, Math.PI, false);
+      g.strokeStyle = '#e07b0c'; g.lineWidth = r * 0.13; g.stroke();
+      // 中心
+      g.beginPath(); g.arc(0, 0, r * 0.06, 0, TAU);
+      g.fillStyle = '#fff8e2'; g.fill();
+      g.restore();
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0);
+      g.strokeStyle = 'rgba(255,255,255,0.22)'; g.lineWidth = 1.6; g.stroke();
+      break;
+    }
+
+    /* 苹果：红皮 + 米白果肉 + 果核 */
+    case 'apple': {
+      halfPath(g, r);
+      const grd = g.createRadialGradient(0, r * 0.2, r * 0.06, 0, r * 0.3, r);
+      grd.addColorStop(0, '#fffdf2');
+      grd.addColorStop(0.6, '#f7f0d8');
+      grd.addColorStop(1, '#e8dcbe');
+      g.fillStyle = grd; g.fill();
+      g.save(); halfPath(g, r); g.clip();
+      // 纤维纹
+      g.strokeStyle = 'rgba(200,180,140,0.22)'; g.lineWidth = r * 0.02;
+      for (let i = 0; i < 12; i++) {
+        const a = Math.PI * (i / 11);
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+        g.stroke();
+      }
+      // 果核
+      g.beginPath();
+      g.ellipse(0, r * 0.42, r * 0.17, r * 0.22, 0, 0, TAU);
+      g.fillStyle = 'rgba(226,208,164,0.9)'; g.fill();
+      g.beginPath(); g.ellipse(0, r * 0.44, r * 0.08, r * 0.11, 0.2, 0, TAU);
+      g.fillStyle = '#6b4a24'; g.fill();
+      g.beginPath(); g.ellipse(-r * 0.07, r * 0.36, r * 0.035, r * 0.055, -0.3, 0, TAU);
+      g.fillStyle = '#3d2410'; g.fill();
+      // 红皮
+      g.beginPath(); g.arc(0, 0, r * 0.94, 0, Math.PI, false);
+      g.strokeStyle = '#c9302c'; g.lineWidth = r * 0.14; g.stroke();
+      g.beginPath(); g.arc(0, 0, r * 0.865, 0, Math.PI, false);
+      g.strokeStyle = 'rgba(255,170,160,0.5)'; g.lineWidth = r * 0.05; g.stroke();
+      g.restore();
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0);
+      g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1.6; g.stroke();
+      break;
+    }
+
+    /* 香蕉：黄皮 + 乳白果肉 */
+    case 'banana': {
+      // 香蕉切面是个弯月形，不能画成圆盘：外沿是皮、内沿是果肉，中间一条褐色芯痕
+      const cres = (k) => {
+        g.beginPath();
+        g.moveTo(0, -r * 0.98);
+        g.quadraticCurveTo(r * 0.88 * k, 0, 0, r * 0.98);
+        g.quadraticCurveTo(r * 0.30 * k, 0, 0, -r * 0.98);
+        g.closePath();
+      };
+      cres(1);
+      const grd = g.createLinearGradient(0, 0, r * 0.86, 0);
+      grd.addColorStop(0, '#fffbe8');
+      grd.addColorStop(0.55, '#fff2c2');
+      grd.addColorStop(1, '#f0d98c');
+      g.fillStyle = grd; g.fill();
+
+      g.save(); cres(1); g.clip();
+      // 褐色芯痕（香蕉三棱籽的痕迹）
+      g.beginPath();
+      g.moveTo(0, -r * 0.8); g.quadraticCurveTo(r * 0.30, 0, 0, r * 0.8);
+      g.strokeStyle = 'rgba(168,138,78,0.42)';
+      g.lineWidth = r * 0.05; g.stroke();
+      g.fillStyle = 'rgba(120,94,46,0.55)';
+      for (let i = 0; i < 4; i++) {
+        const t = -0.6 + i * 0.4;
+        g.beginPath();
+        g.ellipse(r * (0.14 + Math.abs(t) * 0.03), t * r * 0.62, r * 0.028, r * 0.045, 0.3, 0, TAU);
+        g.fill();
+      }
+      // 果肉的轻微纤维竖纹
+      g.strokeStyle = 'rgba(255,255,255,0.35)';
+      g.lineWidth = r * 0.02;
+      for (let i = 0; i < 4; i++) {
+        const x = r * (0.1 + i * 0.14);
+        g.beginPath();
+        g.moveTo(x, -r * 0.7); g.quadraticCurveTo(x + r * 0.16, 0, x, r * 0.7);
+        g.stroke();
+      }
+      g.restore();
+
+      // 香蕉皮：只描外沿，越靠外越黄，内沿留一圈深色分界
+      g.beginPath();
+      g.moveTo(0, -r * 0.98);
+      g.quadraticCurveTo(r * 0.88, 0, 0, r * 0.98);
+      g.strokeStyle = '#e0ad22'; g.lineWidth = r * 0.19; g.lineCap = 'round'; g.stroke();
+      g.beginPath();
+      g.moveTo(0, -r * 0.97);
+      g.quadraticCurveTo(r * 0.74, 0, 0, r * 0.97);
+      g.strokeStyle = 'rgba(255,244,180,0.55)'; g.lineWidth = r * 0.05; g.stroke();
+      g.beginPath();
+      g.moveTo(0, -r * 0.98);
+      g.quadraticCurveTo(r * 0.30, 0, 0, r * 0.98);
+      g.strokeStyle = 'rgba(150,116,40,0.45)'; g.lineWidth = r * 0.03; g.stroke();
+      // 两端的褐色蒂头
+      g.fillStyle = '#7a5a22';
+      g.beginPath(); g.arc(0, -r * 0.96, r * 0.07, 0, TAU); g.fill();
+      g.beginPath(); g.arc(0, r * 0.96, r * 0.055, 0, TAU); g.fill();
+      break;
+    }
+
+    /* 菠萝：金黄果肉 + 纤维 + 菱格皮 */
+    case 'pineapple': {
+      halfPath(g, r);
+      const grd = g.createRadialGradient(0, r * 0.12, r * 0.08, 0, r * 0.3, r);
+      grd.addColorStop(0, '#ffeaa2');
+      grd.addColorStop(0.5, '#ffcb42');
+      grd.addColorStop(1, '#dd9714');
+      g.fillStyle = grd; g.fill();
+      g.save(); halfPath(g, r); g.clip();
+      // 放射纤维
+      g.strokeStyle = 'rgba(200,140,20,0.20)';
+      for (let i = 0; i < 26; i++) {
+        const a = Math.PI * (i / 25);
+        g.beginPath(); g.moveTo(0, r * 0.1);
+        g.lineTo(Math.cos(a) * r * 0.92, Math.sin(a) * r * 0.92);
+        g.lineWidth = r * 0.018; g.stroke();
+      }
+      // 硬芯
+      g.beginPath(); g.arc(0, r * 0.1, r * 0.135, 0, TAU);
+      g.fillStyle = 'rgba(255,238,168,0.9)'; g.fill();
+      g.beginPath(); g.arc(0, r * 0.1, r * 0.135, 0, TAU);
+      g.strokeStyle = 'rgba(196,140,30,0.45)'; g.lineWidth = r * 0.018; g.stroke();
+      // 贴着果皮的一圈褐色果目小点
+      g.fillStyle = 'rgba(122,74,8,0.55)';
+      for (let i = 0; i < 15; i++) {
+        const a = Math.PI * (0.04 + 0.92 * (i / 14));
+        g.beginPath();
+        g.ellipse(Math.cos(a) * r * 0.80, Math.sin(a) * r * 0.80, r * 0.024, r * 0.032, a, 0, TAU);
+        g.fill();
+      }
+      // 皮
+      g.beginPath(); g.arc(0, 0, r * 0.94, 0, Math.PI, false);
+      g.strokeStyle = '#b8791a'; g.lineWidth = r * 0.15; g.stroke();
+      g.beginPath(); g.arc(0, 0, r * 0.86, 0, Math.PI, false);
+      g.strokeStyle = 'rgba(255,230,140,0.6)'; g.lineWidth = r * 0.05; g.stroke();
+      g.restore();
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0);
+      g.strokeStyle = 'rgba(255,255,255,0.22)'; g.lineWidth = 1.6; g.stroke();
+      break;
+    }
+
+    /* 草莓：红皮 + 粉白果肉 + 白籽 */
+    case 'strawberry': {
+      halfPath(g, r);
+      const grd = g.createRadialGradient(0, r * 0.14, r * 0.06, 0, r * 0.3, r);
+      grd.addColorStop(0, '#ffe6ea');
+      grd.addColorStop(0.42, '#ff9db0');
+      grd.addColorStop(1, '#e2415c');
+      g.fillStyle = grd; g.fill();
+      g.save(); halfPath(g, r); g.clip();
+      // 白籽
+      g.fillStyle = '#fffdf5';
+      for (let i = 0; i < 14; i++) {
+        const a = Math.PI * (0.08 + 0.84 * h1(i));
+        const d = r * (0.3 + 0.45 * h1(i + 16));
+        g.save();
+        g.translate(Math.cos(a) * d, Math.sin(a) * d);
+        g.rotate(a);
+        g.beginPath(); g.ellipse(0, 0, r * 0.035, r * 0.06, 0, 0, TAU); g.fill();
+        g.restore();
+      }
+      // 中心维管束
+      g.beginPath();
+      g.ellipse(0, r * 0.34, r * 0.2, r * 0.26, 0, 0, TAU);
+      g.fillStyle = 'rgba(255,240,240,0.75)'; g.fill();
+      // 皮
+      g.beginPath(); g.arc(0, 0, r * 0.93, 0, Math.PI, false);
+      g.strokeStyle = '#d62839'; g.lineWidth = r * 0.15; g.stroke();
+      g.restore();
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0);
+      g.strokeStyle = 'rgba(255,255,255,0.24)'; g.lineWidth = 1.6; g.stroke();
+      break;
+    }
+
+    /* 火龙果：玫红皮 + 白肉 + 黑芝麻籽 */
+    case 'dragonfruit': {
+      halfPath(g, r);
+      const grd = g.createRadialGradient(0, r * 0.12, r * 0.05, 0, r * 0.3, r);
+      grd.addColorStop(0, '#ffffff');
+      grd.addColorStop(0.65, '#fdf4f6');
+      grd.addColorStop(1, '#f2dfe6');
+      g.fillStyle = grd; g.fill();
+      g.save(); halfPath(g, r); g.clip();
+      // 黑芝麻籽
+      g.fillStyle = '#241a20';
+      for (let i = 0; i < 30; i++) {
+        const a = Math.PI * (0.04 + 0.92 * h1(i));
+        const d = r * (0.2 + 0.6 * h1(i + 31));
+        g.beginPath();
+        g.ellipse(Math.cos(a) * d, Math.sin(a) * d, r * 0.022, r * 0.033, a, 0, TAU);
+        g.fill();
+      }
+      // 皮
+      g.beginPath(); g.arc(0, 0, r * 0.94, 0, Math.PI, false);
+      g.strokeStyle = '#d6336c'; g.lineWidth = r * 0.14; g.stroke();
+      g.beginPath(); g.arc(0, 0, r * 0.87, 0, Math.PI, false);
+      g.strokeStyle = 'rgba(255,200,220,0.55)'; g.lineWidth = r * 0.05; g.stroke();
+      g.restore();
+      // 边缘绿鳞
+      for (let i = 1; i < 6; i++) {
+        const a = Math.PI * (i / 6);
+        g.save();
+        g.translate(Math.cos(a) * r * 0.94, Math.sin(a) * r * 0.94);
+        g.rotate(a - Math.PI / 2);
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.quadraticCurveTo(r * 0.14, -r * 0.1, 0, -r * 0.26);
+        g.quadraticCurveTo(-r * 0.14, -r * 0.1, 0, 0);
+        g.fillStyle = '#63b83f'; g.fill();
+        g.restore();
+      }
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0);
+      g.strokeStyle = 'rgba(255,255,255,0.24)'; g.lineWidth = 1.6; g.stroke();
+      break;
+    }
+
+    /* 石榴：金橙果皮 + 蜜色果肉 + 红金宝石籽（奖励水果被切开后的两半截面） */
+    case 'pomegranate': {
+      halfPath(g, r);
+      const grd = g.createRadialGradient(0, r * 0.05, r * 0.05, 0, r * 0.3, r);
+      grd.addColorStop(0, '#fff6d0');
+      grd.addColorStop(0.45, '#ffe08a');
+      grd.addColorStop(1, '#e0a12c');
+      g.fillStyle = grd; g.fill();
+      g.save(); halfPath(g, r); g.clip();
+      // 内层白色海绵质皮
+      g.beginPath(); g.arc(0, 0, r * 0.925, 0, Math.PI, false);
+      g.strokeStyle = '#fff8e4'; g.lineWidth = r * 0.075; g.stroke();
+      // 宝石籽：按同心弧排布，红宝石与金珠混搭，每颗带各自的高光
+      const arilCols = ['#e8163f', '#ff4d6d', '#d2003a', '#ffb01f', '#ffd766'];
+      for (let ring = 0; ring < 4; ring++) {
+        const rr = r * (0.20 + ring * 0.175);
+        const cnt = 5 + ring * 3;
+        for (let i = 0; i < cnt; i++) {
+          const a = Math.PI * (0.06 + 0.88 * (i / (cnt - 1))) + (h1(ring * 31 + i) - 0.5) * 0.10;
+          const d = rr * (0.94 + 0.10 * h1(i + ring * 7));
+          const sr = r * (0.046 + 0.022 * h1(i * 3 + ring));
+          g.save();
+          g.translate(Math.cos(a) * d, Math.sin(a) * d * 0.96);
+          g.rotate(a);
+          const ag = g.createRadialGradient(-sr * 0.3, -sr * 0.35, sr * 0.1, 0, 0, sr);
+          ag.addColorStop(0, '#ffffff');
+          ag.addColorStop(0.3, arilCols[(i + ring) % arilCols.length]);
+          ag.addColorStop(1, 'rgba(96,4,22,0.92)');
+          g.fillStyle = ag;
+          g.beginPath(); g.ellipse(0, 0, sr * 1.15, sr, 0, 0, TAU); g.fill();
+          g.restore();
+        }
+      }
+      // 切面水光
+      g.globalAlpha = 0.20;
+      g.fillStyle = '#fff';
+      g.beginPath(); g.ellipse(-r * 0.3, r * 0.3, r * 0.32, r * 0.13, -0.55, 0, TAU); g.fill();
+      g.restore();
+      // 金橙果皮外沿 + 皮肉分界
+      g.beginPath(); g.arc(0, 0, r * 0.955, 0, Math.PI, false);
+      g.strokeStyle = '#c9800a'; g.lineWidth = r * 0.11; g.stroke();
+      g.beginPath(); g.arc(0, 0, r * 0.895, 0, Math.PI, false);
+      g.strokeStyle = 'rgba(255,226,150,0.75)'; g.lineWidth = r * 0.035; g.stroke();
+      g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0);
+      g.strokeStyle = 'rgba(255,255,255,0.26)'; g.lineWidth = 1.6; g.stroke();
+      break;
+    }
+
+    default: {
+      halfPath(g, r);
+      g.fillStyle = '#ffb3c1'; g.fill();
+    }
+  }
+}
+
+/* 统一绘制一个水果实体（整果或半果） */
+function drawFruitEntity(g, f, time) {
+  g.save();
+  g.translate(f.x, f.y);
+  g.rotate(f.rot);
+  if (f.half) drawHalfFruit(g, f.type, f.r);
+  else drawWholeFruit(g, f.type, f.r, time);
+  g.restore();
+}
+/* ============================================================
+   8. 炸弹：黑铁壳 + 滋滋冒火星的引信
+   ============================================================ */
+function drawBomb(g, b, time) {
+  const r = b.r;
+  const seed = b.seed || 0;
+  const flick = 0.55 + 0.45 * Math.sin(time * 26 + seed);       // 火花闪烁
+  const flick2 = 0.5 + 0.5 * Math.sin(time * 17 + seed * 2.3);
+
+  g.save();
+  g.translate(b.x, b.y);
+  g.rotate(b.rot * 0.3);
+
+  // 9.1 铁壳本体：从左上打光的金属球，越靠边缘越黑
+  const shell = g.createRadialGradient(-r * 0.38, -r * 0.44, r * 0.04, 0, 0, r * 1.06);
+  shell.addColorStop(0, '#6f747c');
+  shell.addColorStop(0.26, '#3a3e45');
+  shell.addColorStop(0.62, '#1d2024');
+  shell.addColorStop(0.88, '#0d0e11');
+  shell.addColorStop(1, '#05050a');
+  g.beginPath(); g.arc(0, 0, r, 0, TAU);
+  g.fillStyle = shell; g.fill();
+
+  // 9.2 边缘反光（环境光照亮下缘，金属球才不会显得像黑纸片）
+  g.beginPath();
+  g.arc(0, 0, r * 0.955, Math.PI * 0.08, Math.PI * 0.72);
+  g.strokeStyle = 'rgba(150,170,200,0.35)';
+  g.lineWidth = r * 0.055;
+  g.stroke();
+
+  // 9.3 顶部金属高光弧
+  g.beginPath();
+  g.arc(0, 0, r * 0.74, Math.PI * 1.16, Math.PI * 1.52);
+  g.strokeStyle = 'rgba(255,255,255,0.30)';
+  g.lineWidth = r * 0.1;
+  g.lineCap = 'round';
+  g.stroke();
+
+  // 9.4 铸铁环箍 + 铆钉，强化“炸弹”的机械感
+  g.save();
+  g.beginPath(); g.arc(0, 0, r * 0.99, 0, TAU); g.clip();
+  g.strokeStyle = 'rgba(0,0,0,0.55)';
+  g.lineWidth = r * 0.12;
+  g.beginPath(); g.arc(0, r * 0.05, r * 0.86, 0, TAU); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,0.10)';
+  g.lineWidth = r * 0.03;
+  g.beginPath(); g.arc(0, r * 0.05, r * 0.80, 0, TAU); g.stroke();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI * 0.82 + i * (Math.PI * 0.41);
+    const rx = Math.cos(a) * r * 0.86, ry = Math.sin(a) * r * 0.86 + r * 0.05;
+    g.beginPath(); g.arc(rx, ry, r * 0.055, 0, TAU);
+    g.fillStyle = 'rgba(200,210,225,0.45)'; g.fill();
+    g.beginPath(); g.arc(rx - r * 0.012, ry - r * 0.012, r * 0.03, 0, TAU);
+    g.fillStyle = 'rgba(255,255,255,0.55)'; g.fill();
+  }
+  g.restore();
+
+  // 9.5 顶盖
+  g.beginPath();
+  g.ellipse(0, -r * 0.80, r * 0.3, r * 0.15, 0, 0, TAU);
+  g.fillStyle = '#1a1c21'; g.fill();
+  g.strokeStyle = 'rgba(180,195,215,0.35)';
+  g.lineWidth = Math.max(1, r * 0.025); g.stroke();
+
+  // 9.6 引信：从顶盖里钻出来的弯曲引线，末端烧得通红
+  const fx0 = 0, fy0 = -r * 0.86;
+  g.strokeStyle = '#7a6a52';
+  g.lineWidth = Math.max(2, r * 0.085);
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(fx0, fy0);
+  g.quadraticCurveTo(r * 0.5, -r * 1.3, r * 0.16, -r * 1.62);
+  g.stroke();
+  g.strokeStyle = 'rgba(255,120,40,' + (0.5 + flick * 0.5).toFixed(2) + ')';
+  g.lineWidth = Math.max(1, r * 0.045);
+  g.beginPath();
+  g.moveTo(r * 0.34, -r * 1.36);
+  g.quadraticCurveTo(r * 0.34, -r * 1.5, r * 0.16, -r * 1.62);
+  g.stroke();
+
+  // 9.7 火花：橙红光斑 + 火舌 + 四射的电火星
+  const fx = r * 0.16, fy = -r * 1.64;
+  g.globalCompositeOperation = 'lighter';
+  const halo = g.createRadialGradient(fx, fy, 0, fx, fy, r * (0.62 + flick * 0.4));
+  halo.addColorStop(0, 'rgba(255,255,235,0.95)');
+  halo.addColorStop(0.28, 'rgba(255,186,64,' + (0.7 + flick * 0.3).toFixed(2) + ')');
+  halo.addColorStop(1, 'rgba(255,60,0,0)');
+  g.beginPath(); g.arc(fx, fy, r * (0.62 + flick * 0.4), 0, TAU);
+  g.fillStyle = halo; g.fill();
+
+  for (let i = 0; i < 3; i++) {
+    const a = -Math.PI * 0.5 + Math.sin(time * 9 + i * 2.1 + seed) * 0.6;
+    const len = r * (0.28 + 0.16 * flick2 + i * 0.06);
+    g.beginPath();
+    g.moveTo(fx, fy);
+    g.quadraticCurveTo(fx + Math.cos(a) * len * 0.6, fy + Math.sin(a) * len * 0.6,
+                       fx + Math.cos(a) * len, fy + Math.sin(a) * len);
+    g.strokeStyle = 'rgba(255,' + (150 + i * 30) + ',40,0.7)';
+    g.lineWidth = Math.max(1, r * 0.045);
+    g.stroke();
+  }
+
+  // 电火星：随时间沿放射方向飞散
+  for (let i = 0; i < 5; i++) {
+    const ph = (time * 1.7 + i * 0.23 + seed) % 1;
+    const a = -Math.PI * 0.5 + (h1(i) - 0.5) * 2.4 + Math.sin(time * 3 + i) * 0.2;
+    const d = r * (0.1 + ph * 0.72);
+    const alpha = (1 - ph) * (0.6 + flick * 0.4);
+    g.beginPath();
+    g.arc(fx + Math.cos(a) * d, fy + Math.sin(a) * d, r * (0.035 + (1 - ph) * 0.02), 0, TAU);
+    g.fillStyle = 'rgba(255,' + Math.round(190 - ph * 90) + ',60,' + alpha.toFixed(2) + ')';
+    g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+
+  // 9.8 危险标记：铁壳上印一颗白骨骷髅，随火花一起明暗脉动
+  g.save();
+  g.globalAlpha = 0.72 + flick * 0.28;
+  // 骷髅头骨
+  g.beginPath(); g.ellipse(0, -r * 0.05, r * 0.35, r * 0.36, 0, 0, TAU);
+  g.fillStyle = 'rgba(238,238,232,0.94)'; g.fill();
+  // 下颌
+  g.beginPath(); g.ellipse(0, r * 0.27, r * 0.21, r * 0.15, 0, 0, TAU);
+  g.fill();
+  // 牙缝
+  g.strokeStyle = 'rgba(30,32,38,0.8)';
+  g.lineWidth = Math.max(1, r * 0.022);
+  for (let i = -1; i <= 1; i++) {
+    g.beginPath(); g.moveTo(i * r * 0.07, r * 0.16); g.lineTo(i * r * 0.07, r * 0.36); g.stroke();
+  }
+  // 眼窝
+  g.fillStyle = '#14161a';
+  g.beginPath(); g.ellipse(-r * 0.15, -r * 0.09, r * 0.095, r * 0.11, 0.12, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(r * 0.15, -r * 0.09, r * 0.095, r * 0.11, -0.12, 0, TAU); g.fill();
+  // 鼻腔
+  g.beginPath();
+  g.moveTo(0, r * 0.02); g.lineTo(-r * 0.045, r * 0.11); g.lineTo(r * 0.045, r * 0.11);
+  g.closePath(); g.fill();
+  g.restore();
+
+
+
+  g.restore();
+}
+
+/* ============================================================
+   9. 游戏状态 / 存档 / HUD 引用
+   ============================================================ */
+const LS_BEST  = 'fruitNinja.best.v1';
+const LS_LANG  = 'fruitNinja.lang.v1';
+const LS_BLADE = 'fruitNinja.blade.v1';
+
+const $ = (id) => document.getElementById(id);
+const ui = {
+  hud: $('hud'), menu: $('menu'), over: $('over'),
+  score: $('scoreVal'), best: $('bestVal'),
+  hearts: $('hearts'), timer: $('timer'),
+  mute: $('btnMute'), lang: $('btnLang'),
+  start: $('btnStart'), again: $('btnAgain'), home: $('btnHome'),
+  overScore: $('overScore'), overBest: $('overBest'), overExtra: $('overExtra'),
+  overTitle: $('overTitle')
+};
+
+const GRAVITY = 1180;      // 重力加速度（px/s²，实际乘 SCALE）
+const ZEN_TIME = 90;       // 禅宗模式 90 秒
+
+const state = {
+  mode: 'classic',         // classic | zen
+  phase: 'menu',           // menu | playing | over
+  score: 0,
+  best: { classic: 0, zen: 0 },
+  hearts: 3,
+  maxHearts: 3,
+  timeLeft: ZEN_TIME,
+  elapsed: 0,              // 本局已进行时间
+  spawnTimer: 0,
+  nextPom: 15,             // 下一颗黄金彩虹石榴的抛射时间点
+  strokeCount: 0,          // 这一刀已切中的水果数量
+  strokeCx: 0, strokeCy: 0,
+  totalCut: 0,
+  bestCombo: 0,
+  shake: 0,                // 震屏幅度
+  flash: 0,               // 全屏白闪
+  frenzy: 0,               // 狂热连切剩余秒数
+  frenzyTotal: 0,
+  lastHud: -1,
+  endReason: 'miss'
+};
+
+const fruits = [];   // 水果与切开后的半果
+const bombs = [];    // 炸弹
+let frenzyOrb = null;// 狂热石榴球
+let gameTime = 0;    // 全局动画时间
+
+/* 最高分读写 */
+function loadBest() {
+  try {
+    const raw = localStorage.getItem(LS_BEST);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        state.best.classic = Math.max(0, o.classic | 0);
+        state.best.zen = Math.max(0, o.zen | 0);
+      }
+    }
+  } catch (e) {}
+}
+function saveBest() {
+  try { localStorage.setItem(LS_BEST, JSON.stringify(state.best)); } catch (e) {}
+}
+
+/* 生命红心 DOM */
+function buildHearts() {
+  let html = '';
+  for (let i = 0; i < state.maxHearts; i++) html += '<span class="heart">❤</span>';
+  ui.hearts.innerHTML = html;
+}
+function syncHearts() {
+  const list = ui.hearts.children;
+  for (let i = 0; i < list.length; i++) {
+    list[i].classList.toggle('lost', i >= state.hearts);
+  }
+}
+
+function syncHud() {
+  if (state.score !== state.lastHud) {
+    state.lastHud = state.score;
+    ui.score.textContent = state.score;
+    ui.score.classList.remove('pop');
+    void ui.score.offsetWidth;      // 强制重排以重播缩放动画
+    ui.score.classList.add('pop');
+    setTimeout(() => ui.score.classList.remove('pop'), 130);
+  }
+  ui.best.textContent = state.best[state.mode] || 0;
+}
+
+/* ============================================================
+   10. 抛射系统：抛物线 + 难度随分数平滑递增
+   ============================================================ */
+// 难度系数 0~1：分数越高，同屏水果越多、节奏越快
+function difficulty() {
+  if (state.mode === 'zen') return clamp(state.elapsed / 55, 0, 1);
+  return clamp(state.score / 620, 0, 1);
+}
+
+function launchX() {
+  // 从屏幕底部不同位置抛出，避开最边缘
+  return rnd(W * 0.14, W * 0.86);
+}
+
+function newFruit(type, x) {
+  const d = FRUIT_DATA[type];
+  const r = d.r * SCALE * rnd(0.94, 1.06);
+  const vy = -rnd(980, 1330) * SCALE;              // 向上的初速度
+  return {
+    kind: 'fruit', type, r,
+    x: x === undefined ? launchX() : x,
+    y: H + r + 12,
+    vx: rnd(-110, 110) * SCALE,
+    vy,
+    rot: rnd(0, TAU),
+    vr: rnd(-3.4, 3.4),                            // 自转角速度
+    half: false,
+    special: type === 'pomegranate'
+  };
+}
+
+function newBomb(x) {
+  return {
+    kind: 'bomb',
+    r: 34 * SCALE,
+    x: x === undefined ? launchX() : x,
+    y: H + 60,
+    vx: rnd(-90, 90) * SCALE,
+    vy: -rnd(900, 1240) * SCALE,
+    rot: rnd(0, TAU),
+    vr: rnd(-2.4, 2.4),
+    seed: rnd(0, TAU)
+  };
+}
+
+function spawnWave() {
+  const d = difficulty();
+  // 同时抛出数量：1~2 个 → 4~6 个
+  const lo = Math.round(lerp(1, 4, d));
+  const hi = Math.round(lerp(2, 6, d));
+  const n = rndInt(lo, Math.max(lo, hi));
+
+  // 低概率的黄金彩虹石榴（一段空闲时间后才出现）
+  if (state.elapsed >= state.nextPom && !frenzyOrb && state.frenzy <= 0) {
+    fruits.push(newFruit('pomegranate'));
+    state.nextPom = state.elapsed + rnd(16, 26);
+  }
+
+  for (let i = 0; i < n; i++) {
+    const isBomb = state.mode === 'classic' && Math.random() < (0.10 + 0.16 * d);
+    if (isBomb) bombs.push(newBomb());
+    else fruits.push(newFruit(pick(FRUIT_TYPES)));
+  }
+}
+
+function spawnInterval() {
+  const d = difficulty();
+  return lerp(1.08, 0.42, d) * rnd(0.86, 1.16);
+}
+
+/* ============================================================
+   11. 切割：一刀多果 / 半果分离 / 果汁飞溅 / 狂热石榴
+   ============================================================ */
+// 把一颗完整水果切成两半（切面角度 = 刀锋角度），两半沿法线方向飞散
+function splitFruit(f, cutAngle) {
+  const nx = -Math.sin(cutAngle), ny = Math.cos(cutAngle);
+  const sp = rnd(90, 220) * SCALE;
+
+  for (let s = -1; s <= 1; s += 2) {
+    fruits.push({
+      kind: 'fruit', type: f.type, r: f.r,
+      x: f.x + nx * f.r * 0.14 * s,
+      y: f.y + ny * f.r * 0.14 * s,
+      vx: f.vx * 0.72 + nx * sp * s + rnd(-30, 30),
+      vy: f.vy * 0.72 + ny * sp * s - rnd(40, 110) * SCALE,
+      rot: s > 0 ? cutAngle : cutAngle + Math.PI,   // 半果切面贴合刀线
+      vr: rnd(1.8, 4.6) * s,
+      half: true,
+      special: false
+    });
+  }
+}
+
+// 狂热连切：切中黄金彩虹石榴，2 秒内可反复划切同一个球狂刷分
+function startFrenzy(f) {
+  state.frenzy = 2.0;
+  state.frenzyTotal = 0;
+  frenzyOrb = {
+    x: f.x, y: clamp(f.y, H * 0.28, H * 0.62),
+    vx: f.vx * 0.45, vy: -Math.abs(f.vy) * 0.32,
+    r: f.r * 1.04, rot: 0, vr: 2.6, hits: 0, pulse: 0
+  };
+  spawnJuice(f.x, f.y, '#ffe066', 46);
+  addSplat(f.x, f.y, 'rgba(255,214,74,0.9)', f.r * 1.1);
+  addShock(f.x, f.y, '#ffd94a', 190);
+  state.shake = Math.max(state.shake, 7);
+  SFX.frenzy();
+}
+
+// 切中一颗水果（结算分数、特效、半果）
+function cutFruit(f, cutAngle) {
+  if (f.half) return;
+  if (f.special) { startFrenzy(f); f.dead = true; return; }
+
+  const data = FRUIT_DATA[f.type];
+  splitFruit(f, cutAngle);
+  f.dead = true;
+
+  state.score += 10;
+  state.totalCut++;
+  state.strokeCount++;
+
+  // 汁水粒子沿切线两侧爆开
+  spawnJuice(f.x, f.y, data.juice, 26, Math.cos(cutAngle + Math.PI / 2), Math.sin(cutAngle + Math.PI / 2));
+  addSplat(f.x, f.y, data.juice, f.r * rnd(0.85, 1.15));
+  addShock(f.x, f.y, data.juice, f.r * 1.5);
+
+  SFX.slice();
+  state.shake = Math.max(state.shake, 3.2);
+}
+
+// 一刀结束：3 连切及以上给额外奖励 + 金色浮动文字 + 震屏
+function finishStroke() {
+  const n = state.strokeCount;
+  state.strokeCount = 0;
+  if (n >= 3) {
+    const bonus = n * 10;
+    state.score += bonus;
+    state.bestCombo = Math.max(state.bestCombo, n);
+    addFloat(state.strokeCx / n, state.strokeCy / n,
+             n + I18N[lang].comboUnit + ' +' + bonus + '！', '#ffd94a', 30 * SCALE);
+    addFloat(state.strokeCx / n, state.strokeCy / n + 30 * SCALE,
+             I18N[lang].comboWord, '#fff3d0', 16 * SCALE);
+    state.shake = Math.max(state.shake, 6.5);
+    SFX.combo(n);
+  }
+}
+
+// 狂热石榴被再次划中
+function hitFrenzyOrb(cutAngle) {
+  const o = frenzyOrb;
+  o.hits++;
+  const pts = 10 + o.hits * 5;
+  state.score += pts;
+  state.frenzyTotal += pts;
+  state.totalCut++;
+  o.pulse = 1;
+
+  spawnJuice(o.x, o.y, '#ffe066', 20, Math.cos(cutAngle + Math.PI / 2), Math.sin(cutAngle + Math.PI / 2));
+  addShock(o.x, o.y, '#ffd94a', o.r * 2);
+  addFloat(o.x + rnd(-20, 20), o.y - o.r * 0.6, '+' + pts, '#fff0a0', (18 + Math.min(o.hits, 8) * 2) * SCALE);
+  if (o.hits % 4 === 0) SFX.combo(o.hits);
+  else SFX.slice();
+  state.shake = Math.max(state.shake, 3);
+}
+
+// 炸弹：全屏白光 + 强震屏 + 结束游戏
+function explodeBomb(b) {
+  b.dead = true;
+  state.flash = 1;
+  state.shake = 22;
+  spawnJuice(b.x, b.y, '#ffb347', 70);
+  spawnSparks(b.x, b.y, 60);
+  addShock(b.x, b.y, '#ffd166', 320);
+  SFX.boom();
+  // 冲击波把附近水果也炸开
+  for (const f of fruits) {
+    if (f.half || f.dead) continue;
+    if (Math.hypot(f.x - b.x, f.y - b.y) < 260 * SCALE) {
+      spawnJuice(f.x, f.y, FRUIT_DATA[f.type].juice, 18);
+      f.dead = true;
+    }
+  }
+  endGame('bomb');
+}
+
+/* 线段检测：把本帧的划动线段与所有水果/炸弹求交 */
+function sliceSegment(x1, y1, x2, y2) {
+  if (state.phase !== 'playing') return;
+  const dx = x2 - x1, dy = y2 - y1;
+  if (dx * dx + dy * dy < 1) return;              // 位移太小不算一刀
+  const cutAngle = Math.atan2(dy, dx);
+
+  for (let i = fruits.length - 1; i >= 0; i--) {
+    const f = fruits[i];
+    if (f.dead || f.half) continue;
+    if (!segHitsCircle(x1, y1, x2, y2, f.x, f.y, f.r * 0.94)) continue;
+    if (f.special) { cutFruit(f, cutAngle); continue; }
+    state.strokeCx += f.x; state.strokeCy += f.y;
+    cutFruit(f, cutAngle);
+  }
+
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const b = bombs[i];
+    if (b.dead) continue;
+    if (segHitsCircle(x1, y1, x2, y2, b.x, b.y, b.r * 0.92)) {
+      explodeBomb(b);
+      return;
+    }
+  }
+
+  if (frenzyOrb && state.frenzy > 0 && segHitsCircle(x1, y1, x2, y2, frenzyOrb.x, frenzyOrb.y, frenzyOrb.r * 1.08)) {
+    hitFrenzyOrb(cutAngle);
+  }
+}
+
+/* ============================================================
+   12. 一局的生命周期
+   ============================================================ */
+function startGame() {
+  fruits.length = 0;
+  bombs.length = 0;
+  particles.length = 0;
+  splats.length = 0;
+  floats.length = 0;
+  marks.length = 0;
+  shocks.length = 0;
+  trail.length = 0;
+  frenzyOrb = null;
+
+  state.phase = 'playing';
+  state.score = 0;
+  state.lastHud = -1;
+  state.elapsed = 0;
+  state.timeLeft = ZEN_TIME;
+  state.hearts = state.maxHearts;
+  state.spawnTimer = 0.35;
+  state.nextPom = rnd(12, 18);
+  state.strokeCount = 0;
+  state.strokeCx = 0; state.strokeCy = 0;
+  state.totalCut = 0;
+  state.bestCombo = 0;
+  state.shake = 0;
+  state.flash = 0;
+  state.frenzy = 0;
+
+  ui.menu.classList.add('hidden');
+  ui.over.classList.add('hidden');
+  ui.hud.classList.remove('hide');
+  ui.timer.classList.toggle('on', state.mode === 'zen');
+  ui.timer.classList.remove('warn');
+
+  buildHearts();
+  syncHearts();
+  syncHud();
+  SFX.unlock();
+}
+
+function setOverTitle() {
+  const d = I18N[lang];
+  ui.overTitle.textContent = state.endReason === 'bomb' ? d.overBomb
+                           : state.endReason === 'time' ? d.overTime
+                           : d.over;
+}
+
+function endGame(reason) {
+  if (state.phase === 'over') return;
+  state.phase = 'over';
+  state.strokeCount = 0;
+
+  const isNew = state.score > (state.best[state.mode] || 0);
+  if (isNew) { state.best[state.mode] = state.score; saveBest(); }
+
+  ui.overScore.textContent = state.score;
+  ui.overBest.textContent = state.best[state.mode];
+  state.endReason = reason;
+  setOverTitle();
+  ui.overExtra.innerHTML = (isNew ? '<b style="color:#ffd94a">' + I18N[lang].newRecord + '</b><br>' : '') +
+    I18N[lang].overStats.replace('{cut}', state.totalCut).replace('{combo}', state.bestCombo);
+  ui.over.classList.remove('hidden');
+  ui.hud.classList.add('hide');
+  ui.timer.classList.remove('on');
+  syncHud();
+}
+
+/* ============================================================
+   13. 输入：鼠标按住滑动 / 手指划屏
+   ============================================================ */
+const ptr = { id: null, down: false, x: 0, y: 0 };
+
+function evPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function onDown(e) {
+  if (state.phase !== 'playing') return;
+  SFX.unlock();
+  ptr.id = e.pointerId;
+  ptr.down = true;
+  const p = evPos(e);
+  ptr.x = p.x; ptr.y = p.y;
+  state.strokeCount = 0;
+  state.strokeCx = 0; state.strokeCy = 0;
+  trail.length = 0;
+  trail.push({ x: p.x, y: p.y, t: performance.now() / 1000 });
+  SFX.swipe();
+  if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
+  e.preventDefault();
+}
+
+function onMove(e) {
+  if (!ptr.down || (ptr.id !== null && e.pointerId !== ptr.id)) return;
+  const p = evPos(e);
+  // 关键：用「上一帧坐标 → 当前帧坐标」的线段做碰撞，快速甩刀也不漏
+  sliceSegment(ptr.x, ptr.y, p.x, p.y);
+  ptr.x = p.x; ptr.y = p.y;
+  trail.push({ x: p.x, y: p.y, t: performance.now() / 1000 });
+  if (trail.length > 320) trail.shift();
+  e.preventDefault();
+}
+
+function onUp(e) {
+  if (!ptr.down) return;
+  ptr.down = false;
+  ptr.id = null;
+  finishStroke();
+}
+
+canvas.addEventListener('pointerdown', onDown);
+canvas.addEventListener('pointermove', onMove);
+canvas.addEventListener('pointerup', onUp);
+canvas.addEventListener('pointercancel', onUp);
+canvas.addEventListener('pointerleave', onUp);
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+// 老版 iOS：阻止页面滚动与缩放
+document.addEventListener('touchmove', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+/* ============================================================
+   14. 每帧更新
+   ============================================================ */
+function update(dt) {
+  // 震屏与白闪衰减
+  state.shake *= Math.pow(0.0015, dt);
+  if (state.shake < 0.05) state.shake = 0;
+  state.flash *= Math.pow(0.004, dt);
+  if (state.flash < 0.01) state.flash = 0;
+
+  updateFx(dt);
+
+  if (state.phase === 'playing') {
+    state.elapsed += dt;
+
+    // 禅宗倒计时
+    if (state.mode === 'zen') {
+      state.timeLeft -= dt;
+      if (state.timeLeft <= 0) { state.timeLeft = 0; endGame('time'); }
+      ui.timer.textContent = Math.ceil(state.timeLeft) + 's';
+      ui.timer.classList.toggle('warn', state.timeLeft <= 10);
+    }
+
+    // 抛射节奏
+    state.spawnTimer -= dt;
+    if (state.spawnTimer <= 0) {
+      spawnWave();
+      state.spawnTimer = spawnInterval();
+    }
+  }
+
+  // 水果物理（抛物线）
+  for (let i = fruits.length - 1; i >= 0; i--) {
+    const f = fruits[i];
+    if (f.dead) { fruits.splice(i, 1); continue; }
+    f.vy += GRAVITY * SCALE * dt;
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
+    f.rot += f.vr * dt;
+
+    // 完整水果落到屏幕下方 = 漏切
+    if (!f.half && state.phase === 'playing' && f.y - f.r > H + 8 && f.vy > 0) {
+      if (state.mode === 'classic') {
+        state.hearts = Math.max(0, state.hearts - 1);
+        syncHearts();
+        addMark(f.x, H - 26 * SCALE);
+        SFX.miss();
+        state.shake = Math.max(state.shake, 4);
+        if (state.hearts <= 0) endGame('miss');
+      }
+      fruits.splice(i, 1);
+      continue;
+    }
+    // 飞出屏幕外的半果直接回收
+    if (f.y - f.r > H + 240 || f.x < -320 || f.x > W + 320) fruits.splice(i, 1);
+  }
+
+  // 炸弹物理
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const b = bombs[i];
+    if (b.dead) { bombs.splice(i, 1); continue; }
+    b.vy += GRAVITY * SCALE * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.rot += b.vr * dt;
+    if (b.y - b.r > H + 120) bombs.splice(i, 1);
+  }
+
+  // 狂热石榴球：2 秒内停留场中，可被反复划切
+  if (frenzyOrb) {
+    const o = frenzyOrb;
+    state.frenzy -= dt;
+    o.vy += GRAVITY * SCALE * 0.34 * dt;
+    o.x += o.vx * dt;
+    o.y += o.vy * dt;
+    o.rot += o.vr * dt;
+    o.pulse *= Math.pow(0.02, dt);
+    // 边界反弹，保证球一直留在可切区域
+    const pad = o.r + 12 * SCALE;
+    if (o.x < pad) { o.x = pad; o.vx = Math.abs(o.vx) * 0.7 + 40; }
+    if (o.x > W - pad) { o.x = W - pad; o.vx = -Math.abs(o.vx) * 0.7 - 40; }
+    if (o.y < pad + H * 0.18) { o.y = pad + H * 0.18; o.vy = Math.abs(o.vy) * 0.5; }
+    if (o.y > H - pad) { o.y = H - pad; o.vy = -Math.abs(o.vy) * 0.62 - 120 * SCALE; }
+
+    if (state.frenzy <= 0) {
+      spawnJuice(o.x, o.y, '#ffe066', 40);
+      addSplat(o.x, o.y, 'rgba(255,214,74,0.85)', o.r * 1.2);
+      addShock(o.x, o.y, '#ffd94a', 220);
+      addFloat(o.x, o.y - o.r, I18N[lang].frenzyEnd + ' +' + state.frenzyTotal, '#ffd94a', 22 * SCALE);
+      frenzyOrb = null;
+    }
+  }
+
+  syncHud();
+}
+
+/* ============================================================
+   15. 渲染
+   ============================================================ */
+function renderFrenzyAura(g) {
+  if (!frenzyOrb || state.frenzy <= 0) return;
+  const t = clamp(state.frenzy / 2, 0, 1);
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  const grd = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.72);
+  grd.addColorStop(0, 'rgba(255,196,60,0)');
+  grd.addColorStop(0.7, 'rgba(255,178,40,' + (0.10 + 0.10 * t).toFixed(3) + ')');
+  grd.addColorStop(1, 'rgba(255,120,0,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, W, H);
+  g.restore();
+}
+
+function render() {
+  ctx.save();
+
+  // 震屏
+  if (state.shake > 0.05) {
+    const a = state.shake * SCALE;
+    ctx.translate(rnd(-a, a), rnd(-a, a));
+  }
+
+  ctx.drawImage(bgCanvas, 0, 0, W, H);
+  drawSplats(ctx);
+  renderFrenzyAura(ctx);
+
+  // 半果先画（压在完整水果下面，层次更像真实堆叠）
+  for (const f of fruits) if (f.half && !f.dead) drawFruitEntity(ctx, f, gameTime);
+  for (const b of bombs) if (!b.dead) drawBomb(ctx, b, gameTime);
+  for (const f of fruits) if (!f.half && !f.dead) drawFruitEntity(ctx, f, gameTime);
+
+  // 狂热石榴球
+  if (frenzyOrb) {
+    const o = frenzyOrb;
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    const pulse = 1 + o.pulse * 0.16;
+    ctx.scale(pulse, pulse);
+    ctx.rotate(o.rot);
+    // 金色光晕
+    ctx.globalCompositeOperation = 'lighter';
+    const grd = ctx.createRadialGradient(0, 0, o.r * 0.2, 0, 0, o.r * 2);
+    grd.addColorStop(0, 'rgba(255,235,140,0.40)');
+    grd.addColorStop(1, 'rgba(255,180,40,0)');
+    ctx.beginPath(); ctx.arc(0, 0, o.r * 2, 0, TAU);
+    ctx.fillStyle = grd; ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    drawWholeFruit(ctx, 'pomegranate', o.r, gameTime);
+    ctx.restore();
+  }
+
+  drawParticles(ctx);
+  drawShocks(ctx);
+  drawMarks(ctx);
+  drawBlade(ctx);
+  drawFloats(ctx);
+
+  ctx.restore();
+
+  // 炸弹白光
+  if (state.flash > 0.01) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,252,240,' + Math.min(1, state.flash).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // 狂热连切倒计时提示
+  if (state.frenzy > 0 && frenzyOrb) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const s = 22 * SCALE;
+    ctx.font = '900 ' + (s | 0) + 'px "PingFang SC","Microsoft YaHei",system-ui,sans-serif';
+    ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(gameTime * 8));
+    ctx.fillStyle = '#ffd94a';
+    ctx.shadowColor = '#ff9d00';
+    ctx.shadowBlur = 26;
+    ctx.fillText(I18N[lang].frenzy + ' ' + state.frenzy.toFixed(1) + 's', W / 2, H * 0.105);
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+   16. 多语言（中文 / English 一键切换）
+   ============================================================ */
+const I18N = {
+  zh: {
+    score: '得分', best: '最高', title: '水果忍者',
+    subtitle: '挥刀斩果 · 一刀多杀 · 汁水四溅',
+    modeTitle: '选择模式', classic: '经典模式', classicDesc: '3 颗红心 · 切到炸弹即结束',
+    zen: '禅宗模式', zenDesc: '90 秒倒计时 · 无炸弹尽情切',
+    bladeTitle: '刀刃皮肤', blade0: '经典白刃', blade1: '烈焰红莲', blade2: '冰霜极光',
+    start: '开 始 游 戏',
+    hint: '按住鼠标左键滑动 / 手指划屏切水果<br>一刀划过 3 个以上水果触发疯狂连击',
+    over: '游戏结束', overBomb: '炸弹引爆！', overTime: '时间到！',
+    finalScore: '本局得分', again: '再 来 一 局', home: '返回首页',
+    newRecord: '🎉 新纪录！', overStats: '切果 {cut} 个 · 最高 {combo} 连切',
+    comboUnit: '连切', comboWord: 'COMBO!', frenzy: '狂热连切', frenzyEnd: '狂热结束'
+  },
+  en: {
+    score: 'SCORE', best: 'BEST', title: 'Fruit Ninja',
+    subtitle: 'Slice fast · Chain combos · Juice everywhere',
+    modeTitle: 'GAME MODE', classic: 'Classic', classicDesc: '3 lives · One bomb ends it all',
+    zen: 'Zen Mode', zenDesc: '90 seconds · No bombs, pure slicing',
+    bladeTitle: 'BLADE SKIN', blade0: 'Classic', blade1: 'Crimson Flame', blade2: 'Frost Aurora',
+    start: 'S T A R T',
+    hint: 'Hold the left mouse button and swipe / drag with your finger<br>Slice 3+ fruits in one swipe for a mad combo',
+    over: 'Game Over', overBomb: 'Boom!', overTime: "Time's Up!",
+    finalScore: 'Score', again: 'P L A Y   A G A I N', home: 'Back to Home',
+    newRecord: '🎉 New record!', overStats: '{cut} fruits sliced · best {combo} combo',
+    comboUnit: ' combo', comboWord: 'COMBO!', frenzy: 'FRENZY', frenzyEnd: 'Frenzy ends'
+  }
+};
+let lang = 'zh';
+
+function applyLang() {
+  const dict = I18N[lang];
+  document.querySelectorAll('[data-i18n]').forEach((node) => {
+    const key = node.getAttribute('data-i18n');
+    const v = dict[key];
+    if (v != null) node.innerHTML = v;
+  });
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  ui.lang.textContent = lang === 'zh' ? 'EN' : '中';
+  // 结束面板标题按结束原因重新翻译
+  if (state.phase === 'over') setOverTitle();
+  try { localStorage.setItem(LS_LANG, lang); } catch (e) {}
+  state.lastHud = -1;
+  syncHud();
+}
+
+/* ============================================================
+   17. UI 交互绑定
+   ============================================================ */
+document.querySelectorAll('.mode-card').forEach((card) => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.mode-card').forEach((c) => c.classList.remove('active'));
+    card.classList.add('active');
+    state.mode = card.getAttribute('data-mode');
+  });
+});
+
+document.querySelectorAll('.blade-card').forEach((card) => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.blade-card').forEach((c) => c.classList.remove('active'));
+    card.classList.add('active');
+    bladeIndex = parseInt(card.getAttribute('data-blade'), 10) || 0;
+    try { localStorage.setItem(LS_BLADE, bladeIndex); } catch (e) {}
+  });
+});
+
+ui.start.addEventListener('click', () => startGame());
+ui.again.addEventListener('click', () => startGame());
+ui.home.addEventListener('click', () => {
+  state.phase = 'menu';
+  ui.over.classList.add('hidden');
+  ui.menu.classList.remove('hidden');
+  ui.hud.classList.add('hide');
+  ui.timer.classList.remove('on');
+  buildHearts(); syncHearts(); syncHud();
+});
+
+ui.mute.addEventListener('click', () => {
+  const muted = !SFX.muted;
+  SFX.setMuted(muted);
+  ui.mute.textContent = muted ? '🔇' : '🔊';
+  ui.mute.classList.toggle('muted', muted);
+});
+
+ui.lang.addEventListener('click', () => {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  applyLang();
+});
+
+// 空格键快捷开始 / 重开
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    if (state.phase !== 'playing') { e.preventDefault(); startGame(); }
+  }
+});
+
+// Esc 返回首页
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && state.phase === 'playing') {
+    state.phase = 'menu';
+    ui.menu.classList.remove('hidden');
+    ui.hud.classList.add('hide');
+    ui.timer.classList.remove('on');
+  }
+});
+
+/* ============================================================
+   18. 主循环（60fps，dt 上限防止切后台后瞬移）
+   ============================================================ */
+let lastT = performance.now();
+function frame(now) {
+  let dt = (now - lastT) / 1000;
+  lastT = now;
+  if (!isFinite(dt) || dt < 0) dt = 1 / 60;
+  dt = Math.min(dt, 0.05);
+  gameTime += dt;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   19. 启动
+   ============================================================ */
+loadBest();
+try {
+  const savedLang = localStorage.getItem(LS_LANG);
+  if (savedLang === 'en' || savedLang === 'zh') lang = savedLang;
+  const savedBlade = parseInt(localStorage.getItem(LS_BLADE), 10);
+  if (savedBlade >= 0 && savedBlade < BLADES.length) {
+    bladeIndex = savedBlade;
+    document.querySelectorAll('.blade-card').forEach((c) => {
+      c.classList.toggle('active', parseInt(c.getAttribute('data-blade'), 10) === savedBlade);
+    });
+  }
+} catch (e) {}
+
+resize();
+buildHearts();
+syncHearts();
+applyLang();
+syncHud();
+requestAnimationFrame(frame);
+
+// 自动化测试钩子（不影响正常游戏）
+window.__QA = {
+  state, fruits, bombs,
+  start(mode) {
+    if (mode) {
+      state.mode = mode;
+      document.querySelectorAll('.mode-card').forEach((c) =>
+        c.classList.toggle('active', c.getAttribute('data-mode') === mode));
+    }
+    startGame();
+  },
+  spawn: spawnWave,
+  slice: (x1, y1, x2, y2) => sliceSegment(x1, y1, x2, y2),
+  sliceAll() {
+    for (let i = fruits.length - 1; i >= 0; i--) {
+      const f = fruits[i];
+      if (f.dead || f.half) continue;
+      state.strokeCx += f.x; state.strokeCy += f.y;
+      cutFruit(f, 0);
+    }
+  },
+  endGame, splitFruit, FRUIT_DATA, FRUIT_TYPES,
+  // 测试用：直接投放实体到画面中部，方便自动化验证切割逻辑
+  put(type) {
+    const f = newFruit(type);
+    f.y = H * 0.45; f.vy = 0; f.vx = 0;
+    fruits.push(f);
+    return f;
+  },
+  putBomb() {
+    const b = newBomb();
+    b.y = H * 0.45; b.vy = 0; b.vx = 0;
+    bombs.push(b);
+    return b;
+  },
+  cut(i, ang) { cutFruit(fruits[i], ang || 0); },
+  frenzy: startFrenzy,
+  W: () => W, H: () => H
+};
+/* ============ JuiceKit 统一内核接入：返回大厅 / 静音 / 震动 / 最高分 ============ */
+(function () {
+  var J = window.Juice; if (!J) return;
+  var st = document.createElement('style');
+  st.textContent = '#hud{padding-top:calc(56px + env(safe-area-inset-top))!important}#btnMute{display:none!important}';
+  document.head.appendChild(st);
+  try { SFX.setMuted(!!J.muted); } catch (e) {}
+  var ot = J.toggleMute.bind(J);
+  J.toggleMute = function () { var m = ot(); try { SFX.setMuted(!!m); } catch (e) {} return m; };
+  function buzz(ms) { try { if (!J.muted && navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+  function wrap(n, ms) { var f = SFX[n]; if (typeof f !== 'function') return; SFX[n] = function () { buzz(ms); return f.apply(SFX, arguments); }; }
+  wrap('slice', 8); wrap('combo', 18); wrap('miss', 24); wrap('frenzy', 30);
+  function topBest() { try { var b = state.best || {}, m = 0; for (var k in b) if (b[k] > m) m = b[k]; return m; } catch (e) { return 0; } }
+  J.init({ game: 'fruit', saveOnExit: function () { try { saveBest(); } catch (e) {} } });
+  var lastBest = -1;
+  function syncBest() {
+    var b = topBest();
+    if (b > 0 && b !== lastBest) { lastBest = b; try { J.setBest('fruit', b); } catch (e) {} }
+  }
+  syncBest(); setInterval(syncBest, 1500);
+
+
+})();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d1220">
+<title>解压拧螺丝 · Screw Jam</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:#0a0d16;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  }
+  #cv{display:block;position:fixed;top:0;left:0;width:100%;height:100%;touch-action:none;}
+  @media (orientation:landscape){
+    #hud{padding-top:4px;}
+    #hud .sc{font-size:26px;}
+    #hud .sub{margin-top:4px;font-size:9.5px;}
+    .prop{height:44px;font-size:9.5px;border-radius:14px;}
+    .prop svg{width:16px;height:16px;}
+    #props{padding:6px 12px calc(env(safe-area-inset-bottom,0px) + 8px);gap:8px;}
+  }
+  #safeprobe{position:fixed;left:0;top:0;width:1px;height:env(safe-area-inset-top,0px);opacity:0;pointer-events:none;}
+  #hud{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);padding-top:12px;text-align:center;pointer-events:none;z-index:5;}
+  #hud .sc{font-size:36px;font-weight:800;line-height:1;letter-spacing:-.02em;text-shadow:0 6px 26px rgba(120,180,255,.45);}
+  #hud .sub{margin-top:8px;font-size:10.5px;font-weight:700;letter-spacing:.16em;color:rgba(255,255,255,.42);}
+  #hud .sub b{color:rgba(255,255,255,.84);}
+  #props{
+    position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;gap:10px;
+    padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 12px);
+    background:linear-gradient(180deg,rgba(10,13,22,0) 0%,rgba(10,13,22,.72) 42%,rgba(10,13,22,.94) 100%);
+  }
+  .prop{
+    flex:1;position:relative;height:56px;border-radius:17px;border:1px solid rgba(255,255,255,.13);
+    background:linear-gradient(180deg,rgba(255,255,255,.115),rgba(255,255,255,.045));
+    box-shadow:0 10px 24px -14px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.16);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    font-size:10.5px;font-weight:700;color:rgba(255,255,255,.9);cursor:pointer;
+    transition:transform .14s cubic-bezier(.2,1.5,.4,1),opacity .2s;
+  }
+  .prop:active{transform:scale(.94);}
+  .prop svg{width:19px;height:19px;opacity:.95;}
+  .prop .n{
+    position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;border-radius:10px;
+    background:linear-gradient(180deg,#ffd76a,#ffb020);color:#3a2500;font-size:11px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;padding:0 5px;
+    box-shadow:0 3px 10px -2px rgba(255,180,30,.7),inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .prop.off{opacity:.34;}
+  #toast{
+    position:fixed;left:50%;top:44%;transform:translate(-50%,-50%) scale(.9);z-index:20;
+    padding:10px 18px;border-radius:14px;font-size:13px;font-weight:700;
+    background:rgba(12,16,28,.92);border:1px solid rgba(255,255,255,.16);
+    box-shadow:0 18px 40px -16px rgba(0,0,0,.9);opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .24s cubic-bezier(.2,1.4,.4,1);white-space:nowrap;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  #overlay{
+    position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    background:rgba(6,9,16,.78);backdrop-filter:blur(10px) saturate(130%);
+    -webkit-backdrop-filter:blur(10px) saturate(130%);
+  }
+  #overlay.show{display:flex;}
+  #overlay .card{
+    width:min(300px,82vw);padding:26px 22px 20px;border-radius:26px;text-align:center;
+    background:linear-gradient(180deg,rgba(38,46,72,.96),rgba(20,25,40,.98));
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 30px 70px -26px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.18);
+    animation:pop .34s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes pop{from{transform:scale(.86);opacity:0;}to{transform:scale(1);opacity:1;}}
+  #overlay h2{font-size:21px;margin-bottom:6px;}
+  #overlay p{font-size:12.5px;color:rgba(255,255,255,.56);margin-bottom:18px;line-height:1.6;}
+  #overlay .btn{
+    display:block;width:100%;padding:13px;border-radius:15px;font-size:14px;font-weight:800;border:none;
+    background:linear-gradient(180deg,#6fa8ff,#3d78f0);color:#fff;cursor:pointer;
+    box-shadow:0 12px 26px -12px rgba(70,130,255,.9),inset 0 1px 0 rgba(255,255,255,.3);
+    -webkit-appearance:none;
+  }
+  #overlay .btn.ghost{margin-top:9px;background:rgba(255,255,255,.09);color:rgba(255,255,255,.78);box-shadow:inset 0 1px 0 rgba(255,255,255,.1);}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="safeprobe"></div>
+<div id="hud">
+  <div class="sc" id="score">0</div>
+  <div class="sub">LEVEL <b id="lv">1</b> · 剩余 <b id="left">0</b> · 最高 <b id="best">0</b></div>
+</div>
+<div id="props">
+  <div class="prop" id="pClear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20l7-7"/><path d="M13.5 3.5l7 7-3 3-7-7z"/><path d="M6 14l4 4"/></svg><span>清空备用</span><i class="n" id="cClear">3</i></div>
+  <div class="prop" id="pAuger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span>打孔器</span><i class="n" id="cAuger">3</i></div>
+  <div class="prop" id="pSmash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 8l4-4 8 8-4 4z"/><path d="M9 12l-5 8"/></svg><span>敲碎玻璃</span><i class="n" id="cSmash">3</i></div>
+</div>
+<div id="toast"></div>
+<div id="overlay"><div class="card">
+  <h2 id="ovTitle">备用孔已满</h2>
+  <p id="ovText"></p>
+  <button class="btn" id="ovAgain">再来一局</button>
+  <button class="btn ghost" id="ovHall">返回大厅</button>
+</div></div>
+<script src="juice.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var W = 0, H = 0, DPR = 1;
+  var J = window.Juice || null;
+  var SPARE = { r: 14, gap: 12, x0: 0, totalW: 0, y: 0 };
+  var BOX = { y: 0, w: 92, h: 70, gap: 12, x0: 0 };
+  var BOARD = { cx: 0, cy: 0, r: 150, top: 0, bottom: 0 };
+
+  function safeTop() {
+    var p = document.getElementById('safeprobe');
+    return p ? (p.getBoundingClientRect().height || 0) : 0;
+  }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeIn(t) { return t * t; }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  var PALETTE = [
+    { c: '#ff5f6d' }, { c: '#ffc531' }, { c: '#2fd6a6' },
+    { c: '#4aa8ff' }, { c: '#b07cff' }, { c: '#ff8f3c' }
+  ];
+  var PLATE_COLORS = ['#5b8dff', '#7c5bff', '#2fd6c0', '#ff6f9c', '#54c8ff'];
+
+  var S = {
+    level: 1, score: 0, best: 0,
+    plates: [], boxes: [], spares: [], spareCap: 5,
+    props: { clear: 3, auger: 3, smash: 3 },
+    seqColors: [], seqCursor: 0,
+    over: false, won: false, flying: [], shake: 0
+  };
+
+  /* ================= 关卡生成（恒可解） ================= */
+  function genLevel() {
+    var L = S.level;
+    var prng = mulberry32(0x9e37 + L * 7919);
+
+    var plateCount = 3;
+    if (L >= 3) plateCount = (L % 3 === 0) ? 4 : 3;
+    if (L >= 8) plateCount = 3 + (L % 2);
+
+    var counts = [], total = 0, i, k;
+    for (i = 0; i < plateCount; i++) {
+      var base = 3;
+      if (L >= 4) base = 3 + (prng() < 0.5 ? 1 : 0);
+      if (L >= 9 && i < plateCount - 1) base = 4 + (prng() < 0.4 ? 1 : 0);
+      counts.push(clamp(base, 3, 5));
+      total += counts[counts.length - 1];
+    }
+    while (total % 3 !== 0) { counts[plateCount - 1]++; total++; }
+
+    var groups = total / 3;
+    var boxCount = L >= 2 ? ((L % 2 === 0) ? 3 : 2) : 2;
+    boxCount = Math.min(boxCount, groups);
+
+    // 颜色池：全关只用 boxCount 种颜色，保证每种颜色都必有盒子接收（100% 有解）
+    var pool = [0, 1, 2, 3, 4, 5].slice().sort(function () { return prng() - .5; });
+    var colors = pool.slice(0, boxCount);
+    var seq = [];
+    for (i = 0; i < groups; i++) seq.push(colors[i % boxCount]);
+    if (boxCount >= 2) {
+      for (i = 1; i < seq.length; i++) {
+        if (seq[i] === seq[i - 1]) seq[i] = colors[(colors.indexOf(seq[i]) + 1) % boxCount];
+      }
+    }
+
+    // 螺丝取用顺序：顶层优先 → 颜色必然落在激活盒
+    var order = [];
+    for (i = plateCount - 1; i >= 0; i--) {
+      for (k = 0; k < counts[i]; k++) order.push({ plate: i });
+    }
+    for (i = 0; i < order.length; i += 3) {
+      var col = seq[i / 3];
+      for (var j2 = 0; j2 < 3 && i + j2 < order.length; j2++) order[i + j2].color = col;
+    }
+
+    S.plates = [];
+    for (i = 0; i < plateCount; i++) {
+      var mine = order.filter(function (o) { return o.plate === i; });
+      var scr = [];
+      for (k = 0; k < mine.length; k++) {
+        scr.push({ ci: mine[k].color, color: PALETTE[mine[k].color].c, state: 'on', rot: rnd(0, 1.4), wob: 0, r: 15 });
+      }
+      S.plates.push({
+        z: i, color: PLATE_COLORS[i % PLATE_COLORS.length], state: 'on',
+        screws: scr, fallT: 0, verts: [], cx: 0, cy: 0, rot: 0, radius: 100
+      });
+    }
+
+    S.seqColors = seq; S.seqCursor = boxCount;
+    S.boxes = [];
+    for (i = 0; i < boxCount; i++) {
+      S.boxes.push({ color: PALETTE[colors[i]].c, ci: colors[i], filled: 0, cap: 3, state: 'on' });
+    }
+
+    S.spareCap = 5;
+    S.spares = [];
+    for (i = 0; i < 5; i++) S.spares.push({ screw: null });
+
+    S.flying = []; S.over = false; S.won = false;
+    buildGeometry();
+    updateHud(); updateLeft(); drawProps();
+  }
+
+  /* ================= 布局与几何 ================= */
+  function buildGeometry() {
+    if (!S.plates.length) return;
+    var hudEl = document.getElementById('hud'), propsEl = document.getElementById('props');
+    var hudB = hudEl ? hudEl.getBoundingClientRect().bottom : safeTop() + 94;
+    var propsH = propsEl ? propsEl.getBoundingClientRect().height : 86;
+    var boxY = Math.max(safeTop() + 74, hudB + 6);
+    var boardTop = boxY + BOX.h + 18;
+    var spareY = H - propsH - 34;
+    var boardBottom = spareY - 18;
+
+    BOARD.top = boardTop; BOARD.bottom = boardBottom;
+    BOARD.cx = W / 2;
+    BOARD.cy = (boardTop + boardBottom) / 2;
+    BOARD.r = Math.min(W - 36, boardBottom - boardTop) / 2 * 0.96;
+
+    var n = S.boxes.length;
+    BOX.gap = 12;
+    BOX.w = Math.min(112, (W - 32 - (n - 1) * BOX.gap) / n);
+    BOX.y = boxY;
+    BOX.x0 = (W - (n * BOX.w + (n - 1) * BOX.gap)) / 2;
+
+    var sp = S.spares.length;
+    SPARE.r = Math.min(19, (W - 60) / (sp * 2 + 4));
+    SPARE.gap = Math.min(16, (W - 48 - sp * SPARE.r * 2) / Math.max(1, sp - 1));
+    SPARE.totalW = sp * SPARE.r * 2 + (sp - 1) * SPARE.gap;
+    SPARE.x0 = (W - SPARE.totalW) / 2;
+    SPARE.y = spareY;
+
+    var prng = mulberry32(0x51ed + S.level * 104729);
+    S.plates.forEach(function (p, i) {
+      var R = BOARD.r * (1 - i * 0.095);
+      var ang0 = prng() * Math.PI * 2;
+      p.cx = BOARD.cx + Math.cos(ang0) * R * 0.24;
+      p.cy = BOARD.cy + Math.sin(ang0) * R * 0.20;
+      p.radius = R;
+      var sx = 1 + (prng() - .5) * 0.22, sy = 1 + (prng() - .5) * 0.22;
+      var nv = [6, 7, 5, 8][Math.floor(prng() * 4)];
+      var verts = [];
+      var rot0 = prng() * Math.PI * 2;
+      for (var v = 0; v < nv; v++) {
+        var a = rot0 + v / nv * Math.PI * 2 + (prng() - .5) * 0.16;
+        var rr = R * (0.86 + prng() * 0.14);
+        verts.push({ x: p.cx + Math.cos(a) * rr * sx, y: p.cy + Math.sin(a) * rr * sy * 0.92 });
+      }
+      p.verts = verts;
+
+      var used = [];
+      p.screws.forEach(function (s) {
+        s.r = clamp(R * 0.112, 9, 19);
+        var sc = s.r / 15;
+        var placed = false, tries = 0;
+        while (!placed && tries < 500) {
+          tries++;
+          var ang = prng() * Math.PI * 2;
+          var rad = Math.sqrt(prng()) * R * 0.70;
+          var x = p.cx + Math.cos(ang) * rad * 1.0;
+          var y = p.cy + Math.sin(ang) * rad * 0.84;
+          if (!pointInPoly(x, y, verts, 26 * sc)) continue;
+          var ok = true;
+          for (var u = 0; u < used.length; u++) {
+            if (Math.hypot(used[u].x - x, used[u].y - y) < 47 * sc) { ok = false; break; }
+          }
+          if (!ok) continue;
+          used.push({ x: x, y: y });
+          s.x = x; s.y = y; placed = true;
+        }
+        if (!placed) { s.x = p.cx + rnd(-20, 20) * sc; s.y = p.cy + rnd(-20, 20) * sc; }
+        s.plate = p;
+      });
+    });
+  }
+
+  function pointInPoly(x, y, verts, margin) {
+    margin = margin || 0;
+    var inside = false;
+    for (var i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+      var xi = verts[i].x, yi = verts[i].y, xj = verts[j].x, yj = verts[j].y;
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    if (!inside) return false;
+    if (margin > 0) {
+      for (var k = 0; k < verts.length; k++) {
+        var a = verts[k], b = verts[(k + 1) % verts.length];
+        if (distToSeg(x, y, a.x, a.y, b.x, b.y) < margin) return false;
+      }
+    }
+    return true;
+  }
+  function edgeDist(x, y, verts) {
+    var d = 1e9;
+    for (var k = 0; k < verts.length; k++) {
+      var a = verts[k], b = verts[(k + 1) % verts.length];
+      d = Math.min(d, distToSeg(x, y, a.x, a.y, b.x, b.y));
+    }
+    return d;
+  }
+  function distToSeg(px, py, x1, y1, x2, y2) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy || 1);
+    t = clamp(t, 0, 1);
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+  function norm(p, q) {
+    var dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy) || 1;
+    return { x: dx / L, y: dy / L };
+  }
+
+  /* 遮挡判定：0 可拧；1 被边缘压住一半；2 完全被盖 */
+  function coverOf(s) {
+    var res = 0;
+    for (var i = 0; i < S.plates.length; i++) {
+      var p = S.plates[i];
+      if (p.state !== 'on' || p.z <= (s.plate ? s.plate.z : 0)) continue;
+      var inside = pointInPoly(s.x, s.y, p.verts, 0);
+      var ed = edgeDist(s.x, s.y, p.verts);
+      if (inside) res = Math.max(res, ed > s.r * 1.15 ? 2 : 1);
+      else if (ed < s.r * 0.8) res = Math.max(res, 1);
+      if (res === 2) break;
+    }
+    return res;
+  }
+
+  /* ================= 音效 ================= */
+  function sUnscrew() {
+    if (!J) return;
+    J.noise(0.16, 0.09, 'highpass', 3200);
+    J.tone(700, 1500, 0.14, 'square', 0.05);
+    J.vibrate(8);
+  }
+  function sInBox() {
+    if (!J) return;
+    J.tone(1180, 1580, 0.08, 'triangle', 0.15);
+    J.tone(2400, 2700, 0.06, 'sine', 0.055, 0.035);
+  }
+  function sSpare() { if (J) J.tone(340, 250, 0.13, 'triangle', 0.12); }
+  function sLocked() { if (J) { J.tone(190, 150, 0.1, 'square', 0.065); J.vibrate(10); } }
+  function sDrop() {
+    if (!J) return;
+    J.noise(0.5, 0.15, 'lowpass', 1100);
+    J.tone(160, 58, 0.5, 'sine', 0.12);
+    J.vibrate(24);
+  }
+
+  /* ================= 状态提示 ================= */
+  var toastEl = document.getElementById('toast'), toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1500);
+  }
+  function addScore(n) {
+    S.score += n;
+    if (S.score > S.best) {
+      S.best = S.score;
+      if (J) { try { J.setBest('screw', S.best); } catch (e) {} }
+    }
+    document.getElementById('score').textContent = S.score;
+    document.getElementById('best').textContent = S.best;
+  }
+  function updateHud() {
+    document.getElementById('score').textContent = S.score;
+    document.getElementById('best').textContent = S.best;
+    document.getElementById('lv').textContent = S.level;
+  }
+  function updateLeft() {
+    var remain = 0;
+    S.plates.forEach(function (p) {
+      p.screws.forEach(function (s) { if (s.state === 'on') remain++; });
+    });
+    document.getElementById('left').textContent = remain;
+    return remain;
+  }
+  function drawProps() {
+    var ids = { clear: 'Clear', auger: 'Auger', smash: 'Smash' };
+    Object.keys(ids).forEach(function (k) {
+      document.getElementById('c' + ids[k]).textContent = S.props[k];
+      document.getElementById('p' + ids[k]).classList.toggle('off', S.props[k] <= 0);
+    });
+  }
+
+  /* ================= 交互 ================= */
+  function hitScrew(pt) {
+    for (var i = S.plates.length - 1; i >= 0; i--) {
+      var p = S.plates[i];
+      if (p.state !== 'on') continue;
+      for (var k = 0; k < p.screws.length; k++) {
+        var s = p.screws[k];
+        if (s.state !== 'on' || s.x === undefined) continue;
+        if (Math.hypot(s.x - pt.x, s.y - pt.y) < s.r + 13) {
+          if (coverOf(s) === 2) continue;
+          return s;
+        }
+      }
+    }
+    return null;
+  }
+
+  function onDown(e) {
+    if (S.over || S.won) return;
+    var r = cv.getBoundingClientRect();
+    var pt = { x: e.clientX - r.left, y: e.clientY - r.top };
+    var s = hitScrew(pt);
+    if (!s) return;
+    var cov = coverOf(s);
+    if (cov > 0) {
+      s.wob = 1;
+      sLocked();
+      toast('被上层玻璃压住了，先拧上层');
+      return;
+    }
+    unscrew(s);
+  }
+
+  function unscrew(s) {
+    s.state = 'fly';
+    sUnscrew();
+    var box = null, bi = -1, i;
+    for (i = 0; i < S.boxes.length; i++) {
+      var b = S.boxes[i];
+      if (b.state === 'on' && b.ci === s.ci && b.filled < b.cap) { box = b; bi = i; break; }
+    }
+    if (box) {
+      S.flying.push({
+        s: s, x0: s.x, y0: s.y,
+        x1: BOX.x0 + bi * (BOX.w + BOX.gap) + BOX.w / 2,
+        y1: BOX.y + BOX.h * 0.56,
+        t: 0, dur: 0.42, kind: 'box', box: box, arc: -70
+      });
+    } else {
+      var idx = -1;
+      for (i = 0; i < S.spareCap; i++) if (!S.spares[i].screw) { idx = i; break; }
+      if (idx < 0) { fail(); return; }
+      S.flying.push({
+        s: s, x0: s.x, y0: s.y,
+        x1: spareX(idx), y1: SPARE.y,
+        t: 0, dur: 0.40, kind: 'spare', idx: idx, arc: -50
+      });
+    }
+  }
+
+  function spareX(i) { return SPARE.x0 + i * (SPARE.r * 2 + SPARE.gap) + SPARE.r; }
+
+  function land(f) {
+    if (f.kind === 'box') {
+      if (f.box.state !== 'on' || f.box.ci !== f.s.ci) {
+        var idx2 = -1;
+        for (var q = 0; q < S.spareCap; q++) if (!S.spares[q].screw) { idx2 = q; break; }
+        if (idx2 < 0) { fail(); return; }
+        S.spares[idx2].screw = f.s; sSpare();
+        var c2 = 0;
+        for (var w = 0; w < S.spareCap; w++) if (S.spares[w].screw) c2++;
+        if (c2 >= S.spareCap) { checkPlates(); fail(); return; }
+        checkPlates();
+        return;
+      }
+      f.box.filled++;
+      sInBox();
+      addScore(10 + S.level * 2);
+      if (J) J.float('+' + (10 + S.level * 2), f.x1, f.y1 + 34);
+      if (f.box.filled >= f.box.cap) completeBox(f.box);
+    } else {
+      S.spares[f.idx].screw = f.s;
+      sSpare();
+      var cnt = 0;
+      for (var i = 0; i < S.spareCap; i++) if (S.spares[i].screw) cnt++;
+      if (cnt >= S.spareCap) { checkPlates(); fail(); return; }
+    }
+    checkPlates();
+  }
+
+  function completeBox(b) {
+    b.state = 'done';
+    addScore(30);
+    if (J) { J.sfx.clear(2); J.vibrate(18); }
+    // 刷新为「剩余螺丝中、当前没有盒子接收」的颜色，保证任何拧取顺序都不会卡死
+    var cnt = {}, i, ci;
+    S.plates.forEach(function (p) {
+      if (p.state !== 'on') return;
+      p.screws.forEach(function (s) { if (s.state === 'on') cnt[s.ci] = (cnt[s.ci] || 0) + 1; });
+    });
+    S.flying.forEach(function (f) { cnt[f.s.ci] = (cnt[f.s.ci] || 0) + 1; });
+    var best = -1, bestN = 0, free = -1, freeN = 0;
+    for (var k in cnt) {
+      ci = +k;
+      var n = cnt[ci], used = false;
+      for (i = 0; i < S.boxes.length; i++) {
+        var o = S.boxes[i];
+        if (o !== b && o.state === 'on' && o.ci === ci) { used = true; break; }
+      }
+      if (!used && n > freeN) { free = ci; freeN = n; }
+      if (n > bestN) { best = ci; bestN = n; }
+    }
+    var pick = free >= 0 ? free : best;
+    if (pick >= 0) { b.color = PALETTE[pick].c; b.ci = pick; b.filled = 0; b.state = 'on'; }
+    else { b.state = 'empty'; b.filled = 0; b.color = '#8f9ab4'; }
+  }
+
+  function checkPlates() {
+    var changed = false;
+    S.plates.forEach(function (p) {
+      if (p.state !== 'on') return;
+      var left = 0;
+      p.screws.forEach(function (s) { if (s.state === 'on') left++; });
+      if (left === 0) {
+        p.state = 'fall'; p.fallT = 0; changed = true;
+        sDrop(); addScore(50);
+      }
+    });
+    var remain = updateLeft();
+    if (remain === 0 && !S.over && !S.won) levelUp();
+    if (changed) S.shake = 8;
+  }
+
+  function levelUp() {
+    S.won = true;
+    addScore(100 * S.level);
+    if (J) J.sfx.up();
+    toast('第 ' + S.level + ' 关完成');
+    setTimeout(function () {
+      S.level++;
+      genLevel();
+    }, 850);
+  }
+
+  function fail() {
+    if (S.over) return;
+    S.over = true;
+    if (J) { J.tone(220, 90, 0.55, 'sawtooth', 0.13); J.vibrate([30, 60, 30]); }
+    document.getElementById('ovTitle').textContent = '备用孔已满';
+    document.getElementById('ovText').textContent = '5 个临时孔位都被占满，螺丝无处安放。本局 ' + S.score + ' 分，最高 ' + S.best + ' 分。';
+    document.getElementById('overlay').classList.add('show');
+  }
+
+  document.getElementById('pClear').addEventListener('click', function () {
+    if (S.over || S.won) return;
+    if (S.props.clear <= 0) { toast('清空道具已用完'); return; }
+    var any = false;
+    for (var i = 0; i < S.spareCap; i++) {
+      var sp = S.spares[i];
+      if (sp.screw) {
+        sp.screw.state = 'gone';
+        sp.screw = null;
+        if (J) J.burst(spareX(i), SPARE.y, { n: 10, color: '#ffd76a', r: 2.5 });
+        any = true;
+      }
+    }
+    if (!any) { toast('备用孔里没有螺丝'); return; }
+    S.props.clear--;
+    if (J) { J.sfx.pop(); J.vibrate(14); }
+    addScore(20);
+    toast('备用孔已清空');
+    drawProps();
+  });
+
+  document.getElementById('pAuger').addEventListener('click', function () {
+    if (S.over || S.won) return;
+    if (S.props.auger <= 0) { toast('打孔器已用完'); return; }
+    if (S.spareCap >= 9) { toast('孔位已到上限'); return; }
+    S.props.auger--;
+    S.spareCap = Math.min(9, S.spareCap + 2);
+    while (S.spares.length < S.spareCap) S.spares.push({ screw: null });
+    if (J) { J.sfx.place(); J.vibrate(12); }
+    buildGeometry();
+    toast('临时孔位 +2');
+    drawProps();
+  });
+
+  document.getElementById('pSmash').addEventListener('click', function () {
+    if (S.over || S.won) return;
+    if (S.props.smash <= 0) { toast('敲玻璃已用完'); return; }
+    var best = null, bestN = -1;
+    S.plates.forEach(function (p) {
+      if (p.state !== 'on') return;
+      var n = 0;
+      S.plates.forEach(function (q) {
+        if (q.z <= p.z || q.state !== 'on') return;
+        q.screws.forEach(function (s) {
+          if (s.state === 'on' && pointInPoly(s.x, s.y, p.verts, 0)) n++;
+        });
+      });
+      if (n > bestN) { bestN = n; best = p; }
+    });
+    if (!best) { toast('没有可击碎的玻璃'); return; }
+    S.props.smash--;
+    best.screws.forEach(function (s) { if (s.state === 'on') s.state = 'gone'; });
+    best.state = 'fall'; best.fallT = 0;
+    sDrop();
+    addScore(60);
+    toast('玻璃已击碎');
+    drawProps();
+    checkPlates();
+  });
+
+  document.getElementById('ovAgain').addEventListener('click', function () {
+    document.getElementById('overlay').classList.remove('show');
+    S.score = 0; S.level = 1;
+    genLevel(); updateHud();
+  });
+  document.getElementById('ovHall').addEventListener('click', function () { location.href = 'index.html'; });
+
+  /* ================= 绘制 ================= */
+  function hexA(hex, a) {
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function polyPath(c, verts, rad) {
+    c.beginPath();
+    for (var i = 0; i < verts.length; i++) {
+      var p = verts[i];
+      var prev = verts[(i - 1 + verts.length) % verts.length];
+      var next = verts[(i + 1) % verts.length];
+      var v1 = norm(p, prev), v2 = norm(p, next);
+      var a = { x: p.x + v1.x * rad, y: p.y + v1.y * rad };
+      var b = { x: p.x + v2.x * rad, y: p.y + v2.y * rad };
+      if (i === 0) c.moveTo(a.x, a.y); else c.lineTo(a.x, a.y);
+      c.quadraticCurveTo(p.x, p.y, b.x, b.y);
+    }
+    c.closePath();
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawBg() {
+    var g = ctx.createRadialGradient(W / 2, H * 0.16, 30, W / 2, H * 0.55, H);
+    g.addColorStop(0, '#28324f');
+    g.addColorStop(0.45, '#171d30');
+    g.addColorStop(1, '#090c14');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    roundRect(BOARD.cx - BOARD.r * 1.0, BOARD.cy - BOARD.r * 0.96, BOARD.r * 2.0, BOARD.r * 1.92, 36);
+    ctx.fillStyle = 'rgba(255,255,255,.026)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.055)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPlate(p) {
+    var a = 1, ox = 0, oy = 0, rot = 0;
+    if (p.state === 'fall') {
+      var k = clamp(p.fallT / 0.95, 0, 1);
+      ox = easeIn(k) * 40;
+      oy = easeIn(k) * H * 1.0;
+      rot = easeIn(k) * 0.7;
+      a = 1 - clamp(k / 0.8, 0, 1) * 0.94;
+    }
+    ctx.save();
+    ctx.globalAlpha = a;
+    if (rot) {
+      ctx.translate(p.cx, p.cy + oy);
+      ctx.rotate(rot);
+      ctx.translate(-p.cx, -p.cy);
+      ctx.translate(ox, 0);
+    } else if (oy) {
+      ctx.translate(0, oy);
+    }
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(3,6,14,.66)';
+    ctx.shadowBlur = 26 + p.z * 7;
+    ctx.shadowOffsetY = 13 + p.z * 6;
+    polyPath(ctx, p.verts, 15);
+    ctx.fillStyle = hexA(p.color, 0.36 + p.z * 0.05);
+    ctx.fill();
+    ctx.restore();
+
+    var g = ctx.createLinearGradient(p.cx - p.radius, p.cy - p.radius, p.cx + p.radius, p.cy + p.radius);
+    g.addColorStop(0, hexA(p.color, 0.44));
+    g.addColorStop(0.40, hexA(p.color, 0.19));
+    g.addColorStop(0.68, hexA('#ffffff', 0.11));
+    g.addColorStop(1, hexA(p.color, 0.36));
+    polyPath(ctx, p.verts, 15);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = hexA('#ffffff', 0.46);
+    ctx.stroke();
+
+    ctx.save();
+    polyPath(ctx, p.verts, 15);
+    ctx.clip();
+    ctx.globalAlpha = 0.085;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.4;
+    for (var i = -8; i < 14; i++) {
+      ctx.beginPath();
+      ctx.moveTo(p.cx - p.radius * 1.4 + i * 32, p.cy - p.radius * 1.4);
+      ctx.lineTo(p.cx - p.radius * 1.4 + i * 32 + p.radius * 1.5, p.cy + p.radius * 1.4);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    polyPath(ctx, p.verts, 15);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = hexA('#ffffff', 0.15);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawScrew(x, y, r, color, rot, locked, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+
+    if (!locked) {
+      var pl = 0.5 + 0.5 * Math.sin(performance.now() / 420 + (x + y) * 0.02);
+      ctx.beginPath();
+      ctx.arc(x, y, r * (1.16 + pl * 0.14), 0, Math.PI * 2);
+      ctx.strokeStyle = hexA(color, 0.20 + pl * 0.24);
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.94, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(5,9,18,.5)';
+    ctx.fill();
+
+    var g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+    g.addColorStop(0, hexA('#ffffff', 0.55));
+    g.addColorStop(0.34, color);
+    g.addColorStop(1, hexA(color, 0.6));
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.82, 0, Math.PI * 2);
+    ctx.fillStyle = locked ? 'rgba(118,128,148,.85)' : g;
+    ctx.fill();
+
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = locked ? 'rgba(178,188,208,.32)' : hexA('#ffffff', 0.4);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.lineCap = 'round';
+    ctx.lineWidth = r * 0.26;
+    ctx.strokeStyle = locked ? 'rgba(18,24,38,.52)' : 'rgba(16,22,36,.6)';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.46, 0); ctx.lineTo(r * 0.46, 0);
+    ctx.moveTo(0, -r * 0.46); ctx.lineTo(0, r * 0.46);
+    ctx.stroke();
+    ctx.lineWidth = r * 0.085;
+    ctx.strokeStyle = hexA('#ffffff', locked ? 0.1 : 0.32);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.46, -r * 0.07); ctx.lineTo(r * 0.46, -r * 0.07);
+    ctx.moveTo(-r * 0.07, -r * 0.46); ctx.lineTo(-r * 0.07, r * 0.46);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(x - r * 0.3, y - r * 0.36, r * 0.19, 0, Math.PI * 2);
+    ctx.fillStyle = hexA('#ffffff', locked ? 0.13 : 0.48);
+    ctx.fill();
+
+    if (locked) {
+      ctx.beginPath();
+      ctx.arc(x + r * 0.8, y - r * 0.8, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,86,110,.94)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.65)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawGhost(x, y) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(5,9,18,.42)';
+    ctx.fill();
+    ctx.setLineDash([3.5, 3.5]);
+    ctx.strokeStyle = 'rgba(190,200,225,.38)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(190,200,225,.30)';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBoxes() {
+    S.boxes.forEach(function (b, i) {
+      var x = BOX.x0 + i * (BOX.w + BOX.gap), y = BOX.y, w = BOX.w, h = BOX.h;
+      var active = b.state === 'on';
+      ctx.save();
+      if (!active) ctx.globalAlpha = 0.3;
+      roundRect(x, y, w, h, 16);
+      var g = ctx.createLinearGradient(x, y, x, y + h);
+      g.addColorStop(0, hexA(b.color, active ? 0.30 : 0.12));
+      g.addColorStop(1, hexA(b.color, active ? 0.11 : 0.05));
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = hexA(b.color, active ? 0.68 : 0.28);
+      ctx.stroke();
+
+      var cy = y + h * 0.60, gap = w * 0.26;
+      for (var k = 0; k < 3; k++) {
+        var hx = x + w / 2 + (k - 1) * gap;
+        ctx.beginPath();
+        ctx.arc(hx, cy, 11.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(5,9,18,.6)';
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = hexA(b.color, 0.36);
+        ctx.stroke();
+        if (k < b.filled) {
+          ctx.beginPath();
+          ctx.arc(hx, cy, 8.4, 0, Math.PI * 2);
+          var sg = ctx.createLinearGradient(hx - 6, cy - 6, hx + 6, cy + 6);
+          sg.addColorStop(0, '#ffffff');
+          sg.addColorStop(0.45, b.color);
+          sg.addColorStop(1, hexA(b.color, 0.62));
+          ctx.fillStyle = sg;
+          ctx.fill();
+        }
+      }
+
+      ctx.font = '700 11px -apple-system,"PingFang SC",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = hexA(b.color, active ? 0.95 : 0.45);
+      ctx.fillText(b.state === 'empty' ? '已用完' : (b.filled + '/3'), x + w / 2, y + 17);
+      ctx.restore();
+    });
+  }
+
+  function drawSpares() {
+    var used = 0, i;
+    for (i = 0; i < S.spareCap; i++) if (S.spares[i].screw) used++;
+
+    ctx.save();
+    ctx.font = '700 9.5px -apple-system,"PingFang SC",sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,.32)';
+    ctx.fillText('临时孔位  ' + used + ' / ' + S.spareCap, SPARE.x0, SPARE.y - 24);
+    ctx.restore();
+
+    for (i = 0; i < S.spareCap; i++) {
+      var sp = S.spares[i], x = spareX(i);
+      ctx.beginPath();
+      ctx.arc(x, SPARE.y, SPARE.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(6,10,20,.62)';
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = sp.screw ? 'rgba(255,255,255,.46)' : (i >= 5 ? 'rgba(120,255,190,.42)' : 'rgba(255,255,255,.14)');
+      ctx.stroke();
+      if (sp.screw) drawScrew(x, SPARE.y, SPARE.r * 0.9, sp.screw.color, 0.4, false, 1);
+    }
+  }
+
+  function drawFlyers(dt) {
+    for (var i = S.flying.length - 1; i >= 0; i--) {
+      var f = S.flying[i];
+      f.t += dt / f.dur;
+      var k = clamp(f.t, 0, 1), e = easeOut(k);
+      var x = lerp(f.x0, f.x1, e);
+      var y = lerp(f.y0, f.y1, e) + Math.sin(k * Math.PI) * f.arc;
+      drawScrew(x, y, f.s.r * (1 + Math.sin(k * Math.PI) * 0.32), f.s.color, f.s.rot + k * 14, false, 1 - k * 0.12);
+      if (k >= 1) { S.flying.splice(i, 1); land(f); }
+    }
+  }
+
+  var last = 0;
+  function frame(now) {
+    var dt = Math.min(0.05, ((now - last) / 1000) || 0.016);
+    last = now;
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    if (S.shake > 0.4) {
+      ctx.translate(rnd(-1, 1) * S.shake * 0.5, rnd(-1, 1) * S.shake * 0.5);
+      S.shake *= Math.pow(0.0008, dt);
+    }
+
+    drawBg();
+    drawBoxes();
+
+    S.plates.forEach(function (p) {
+      if (p.state === 'off') return;
+      if (p.state === 'fall') p.fallT += dt;
+      drawPlate(p);
+      if (!(p.state === 'fall' && p.fallT > 0.15)) {
+        p.screws.forEach(function (s) {
+          if (s.state !== 'on' || s.x === undefined) return;
+          var cov = coverOf(s);
+          if (cov === 2) { drawGhost(s.x, s.y); return; }
+          var wob = s.wob > 0 ? Math.sin(s.wob * 42) * 3.4 * s.wob : 0;
+          if (s.wob > 0) s.wob = Math.max(0, s.wob - dt * 2.6);
+          drawScrew(s.x + wob, s.y, s.r, s.color, s.rot, cov > 0, cov > 0 ? 0.92 : 1);
+        });
+      }
+      if (p.state === 'fall' && p.fallT > 1.1) p.state = 'off';
+    });
+
+    drawSpares();
+    drawFlyers(dt);
+    requestAnimationFrame(frame);
+  }
+
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    var vw = window.innerWidth || 360, vh = window.innerHeight || 640;
+    var sw = vw;
+    // 宽屏/横屏时把画面收进居中的竖屏舞台，保证棋盘不被压扁
+    if (vw > vh * 0.95) sw = Math.min(vw, Math.round(vh * 0.78));
+    var ox = Math.round((vw - sw) / 2);
+    W = sw; H = vh;
+    cv.style.left = ox + 'px';
+    cv.style.width = sw + 'px';
+    cv.style.height = vh + 'px';
+    cv.width = Math.round(sw * DPR);
+    cv.height = Math.round(vh * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ['hud', 'props'].forEach(function (id) {
+      var e = document.getElementById(id);
+      if (!e) return;
+      e.style.left = ox + 'px';
+      e.style.right = (vw - sw - ox) + 'px';
+    });
+    buildGeometry();
+  }
+
+  function boot() {
+    if (J) {
+      try {
+        J.init({ game: 'screw' });
+        var st = J.getStat('screw');
+        S.best = st.best || 0;
+      } catch (e) {}
+    }
+    window.__Screw = { S: S, coverOf: coverOf, box: BOX, spare: SPARE };
+    genLevel();
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', function () { setTimeout(resize, 220); });
+    cv.addEventListener('pointerdown', onDown, { passive: true });
+    document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+    document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    document.addEventListener('touchmove', function (e) { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    setInterval(function () {
+      if (J && S.score > 0) { try { J.setBest('screw', S.score); } catch (e) {} }
+    }, 4000);
+    requestAnimationFrame(function (n) { last = n; frame(n); });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>解压拧螺丝 · Screw Jam</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  body{
+    background:radial-gradient(120% 80% at 50% -10%,#2a3350 0%,#171c2e 46%,#0a0d16 100%);
+    color:#eef1ff;font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;
+  }
+  #cv{display:block;width:100%;height:100%;touch-action:none}
+  #safeprobe{position:fixed;left:0;top:0;width:1px;height:env(safe-area-inset-top,0px);opacity:0;pointer-events:none}
+
+  #hud{position:fixed;left:0;right:0;top:0;pointer-events:none;
+    padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0;
+    display:flex;align-items:flex-start;justify-content:space-between}
+  .lvl{font:900 13px/1 "PingFang SC",system-ui;letter-spacing:1.4px;color:#9aa4cc}
+  .lvl b{display:block;font-size:26px;letter-spacing:-.6px;
+    background:linear-gradient(180deg,#fff,#b9c6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .right{text-align:right}
+  .right .s{font:900 24px/1 system-ui;font-variant-numeric:tabular-nums;color:#ffe08a}
+  .right .b{font:800 10.5px/1.6 "PingFang SC",system-ui;letter-spacing:1.2px;color:#8f98c4}
+
+  #props{position:fixed;left:0;right:0;bottom:0;z-index:5;
+    padding:0 calc(env(safe-area-inset-right,0px) + 14px) calc(env(safe-area-inset-bottom,0px) + 14px) calc(env(safe-area-inset-left,0px) + 14px);
+    display:flex;gap:9px;justify-content:center}
+  .prop{flex:1 1 0;max-width:136px;height:54px;border-radius:17px;position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    background:linear-gradient(160deg,rgba(255,255,255,.13),rgba(255,255,255,.045));
+    border:1px solid rgba(255,255,255,.14);color:#e8ecff;
+    -webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 22px -14px #000;
+    font:800 11.5px/1 "PingFang SC",system-ui,sans-serif;letter-spacing:.2px}
+  .prop svg{width:18px;height:18px;display:block;flex:none}
+  .prop:active{transform:scale(.94);background:rgba(255,255,255,.16)}
+  .prop.on{border-color:#7ee0ff;background:rgba(110,200,255,.24);box-shadow:0 0 0 2px rgba(110,200,255,.35) inset,0 0 22px -6px #4cc4ff}
+  .prop .n{position:absolute;top:5px;right:6px;min-width:16px;height:16px;border-radius:8px;padding:0 4px;
+    display:grid;place-items:center;font:800 10px/1 system-ui;color:#0d1120;background:#ffd98a}
+  .prop .n.zero{background:rgba(255,255,255,.22);color:#c9cee6}
+
+  #over{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(6,8,16,.74);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+  #over.show{display:grid;animation:fade .26s ease-out}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .panel{width:min(84vw,332px);padding:26px 22px 22px;border-radius:26px;text-align:center;
+    background:linear-gradient(165deg,rgba(255,255,255,.15),rgba(255,255,255,.05));
+    border:1px solid rgba(255,255,255,.18);box-shadow:0 30px 70px -30px #000,inset 0 1px 0 rgba(255,255,255,.26)}
+  .panel h2{font-size:22px;font-weight:900;letter-spacing:-.4px}
+  .panel .big{font-size:44px;font-weight:900;letter-spacing:-2px;margin:8px 0 2px;
+    background:linear-gradient(180deg,#fff,#9fb4ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .panel p{font-size:12px;color:#a9b2d8;letter-spacing:.4px;margin-bottom:18px}
+  .btn{width:100%;height:50px;border-radius:16px;border:none;color:#10131f;
+    background:linear-gradient(150deg,#ffe08a,#ffb347);
+    font:900 15px/1 "PingFang SC",system-ui,sans-serif;letter-spacing:.6px;
+    box-shadow:0 14px 28px -14px #ffb347,inset 0 1px 0 rgba(255,255,255,.7)}
+  .btn:active{transform:scale(.97)}
+  .btn.ghost{margin-top:9px;background:rgba(255,255,255,.08);color:#dfe5ff;border:1px solid rgba(255,255,255,.16);box-shadow:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="safeprobe"></div>
+
+<div id="hud">
+  <div class="lvl">LEVEL<b id="lvl">1</b></div>
+  <div class="right">
+    <div class="s" id="score">0</div>
+    <div class="b">BEST <span id="best">0</span></div>
+  </div>
+</div>
+
+<div id="props">
+  <button class="prop" id="pClear">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+    清空备用<span class="n" id="cClear">2</span>
+  </button>
+  <button class="prop" id="pAuger">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    打孔器<span class="n" id="cAuger">2</span>
+  </button>
+  <button class="prop" id="pSmash">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3l8 8-4 4-8-8z"/><path d="M9 7 3 13l8 8 3-3"/><path d="M4 20l4-4"/></svg>
+    敲碎玻璃<span class="n" id="cSmash">2</span>
+  </button>
+</div>
+
+<div id="over">
+  <div class="panel">
+    <h2 id="ovTitle">备用孔已满</h2>
+    <div class="big" id="ovScore">0</div>
+    <p id="ovTip">最高分 0</p>
+    <button class="btn" id="again">再来一局</button>
+    <button class="btn ghost" id="backHall">返回大厅</button>
+  </div>
+</div>
+
+<script src="juice.js"></script>
+<script>
+(function () {
+'use strict';
+
+/* ==================== 基础 ==================== */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+
+const PALETTE = ['#ff5f6d', '#3ea6ff', '#ffc531', '#43d68f', '#b06bff', '#ff8a3d'];
+const PAL_DARK = {'#ff5f6d':'#c03445','#3ea6ff':'#1f6cb0','#ffc531':'#c08c14','#43d68f':'#1f9b64','#b06bff':'#7440c0','#ff8a3d':'#c05a14'};
+
+let W = 0, H = 0, DPR = 1, safeTop = 0;
+let level = 1, score = 0, best = 0;
+let plates = [], screws = [], boxes = [], spares = [], props = {clear: 2, auger: 2, smash: 2};
+let spareCap = 5;
+let board = {x: 0, y: 0, w: 0, h: 0};
+let boxBox = {x: 0, y: 0, w: 0, h: 0};
+let spareBox = {x: 0, y: 0, w: 0, h: 0};
+let over = false, busy = false, win = false;
+let flys = [], fx = [], tNow = 0;
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+const rndi = (a, b) => Math.floor(rnd(a, b + 1));
+const pick = a => a[(Math.random() * a.length) | 0];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+/* ==================== 音效 ==================== */
+function sfxRatchet() {
+  for (let i = 0; i < 4; i++) {
+    Juice.tone(520 - i * 26, 440 - i * 26, 0.045, 'square', 0.05, i * 0.045);
+    Juice.noise(0.03, 0.05, 'bandpass', 2400 - i * 200, i * 0.045);
+  }
+}
+function sfxClick() { Juice.tone(1180, 1560, 0.07, 'triangle', 0.13); Juice.tone(2360, 2360, 0.03, 'sine', 0.05, 0.02); }
+function sfxLand() { Juice.tone(340, 240, 0.1, 'triangle', 0.1); Juice.noise(0.05, 0.05, 'lowpass', 900); }
+function sfxGlassFall() {
+  Juice.noise(0.55, 0.16, 'highpass', 1400);
+  Juice.tone(560, 180, 0.5, 'sine', 0.09, 0.03);
+  Juice.vibrate(18);
+}
+function sfxWrong() { Juice.tone(190, 140, 0.12, 'sawtooth', 0.11); }
+function sfxSpare() { Juice.tone(300, 200, 0.12, 'square', 0.09); }
+function sfxWin() { [0,4,7,12].forEach((s,i)=>Juice.tone(440*Math.pow(2,s/12),440*Math.pow(2,s/12)*1.01,0.42,'sine',0.12,i*0.08)); Juice.vibrate([12,40,12]); }
+
+/* ==================== 布局 ==================== */
+function resize() {
+  DPR = Math.min(2.5, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  safeTop = document.getElementById('safeprobe').offsetHeight || 0;
+  layout();
+}
+function layout() {
+  const top = safeTop + 74;
+  const boxH = 58;
+  boxBox = {x: 14, y: top, w: W - 28, h: boxH};
+  const propH = 54 + 28;
+  const spareH = 46;
+  spareBox = {x: 14, y: H - propH - spareH - 6, w: W - 28, h: spareH};
+  board = {x: 12, y: top + boxH + 14, w: W - 24, h: Math.max(160, spareBox.y - 14 - (top + boxH + 14))};
+  if (plates.length) layoutPlates();
+  layoutSpares();
+}
+function layoutSpares() {
+  const n = spareCap, gap = 10;
+  const w = Math.min(46, (spareBox.w - gap * (n - 1)) / n);
+  const total = n * w + (n - 1) * gap;
+  const x0 = spareBox.x + (spareBox.w - total) / 2;
+  spares = [];
+  for (let i = 0; i < n; i++) spares.push({x: x0 + i * (w + gap) + w / 2, y: spareBox.y + spareBox.h / 2, r: w / 2, screw: null});
+}
+function layoutPlates() {
+  const cx = board.x + board.w / 2, cy = board.y + board.h / 2;
+  const R = Math.min(board.w, board.h) * 0.46;
+  plates.forEach((p, i) => {
+    const s = R * p.k;
+    p.poly = p.base.map(pt => ({x: pt.x * s, y: pt.y * s}));
+    p.cx = cx + p.ox * R; p.cy = cy + p.oy * R;
+    p.rot = p.rot0;
+    applyPlateTransform(p);
+    if (p.screwDefs) {
+      p.screwDefs.forEach(sd => {
+        const local = {x: sd.x * s, y: sd.y * s};
+        sd.wx = p.cx + local.x * Math.cos(p.rot) - local.y * Math.sin(p.rot);
+        sd.wy = p.cy + local.x * Math.sin(p.rot) + local.y * Math.cos(p.rot);
+      });
+    }
+  });
+  // 同步已存在螺丝的世界坐标
+  screws.forEach(s => {
+    const sd = s.def;
+    s.x = sd.wx; s.y = sd.wy;
+  });
+  updateLocks();
+}
+function applyPlateTransform(p) {
+  p.world = p.poly.map(pt => ({
+    x: p.cx + pt.x * Math.cos(p.rot) - pt.y * Math.sin(p.rot),
+    y: p.cy + pt.x * Math.sin(p.rot) + pt.y * Math.cos(p.rot)
+  }));
+}
+
+/* ==================== 几何 ==================== */
+function pointInPoly(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+/* ==================== 关卡生成（保证有解） ==================== */
+function buildShape() {
+  const n = rndi(5, 7);
+  const base = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2 + rnd(-0.12, 0.12);
+    const r = rnd(0.82, 1.0);
+    base.push({x: Math.cos(a) * r, y: Math.sin(a) * r * 0.98});
+  }
+  return base;
+}
+
+function initLevel(lv) {
+  level = lv; over = false; busy = false; win = false;
+  flys = []; fx = []; spareCap = 5;
+  plates = []; screws = []; boxes = [];
+  const nPlates = lv <= 2 ? 3 : (lv <= 5 ? rndi(3, 4) : rndi(3, 4));
+  const colorsN = lv <= 3 ? 3 : (lv <= 8 ? 4 : 5);
+  const palette = PALETTE.slice(0, colorsN);
+
+  // 每块板上的螺丝数（每色 3 的整数倍，总数为 3 的倍数 —— 100% 可解）
+  let groupsLeft = clamp(3 + Math.floor(lv / 2), 3, 14);   // 每组 3 颗同色
+  const groupPer = [];
+  for (let i = 0; i < nPlates; i++) groupPer.push(0);
+  for (let i = 0; i < groupsLeft; i++) groupPer[i % nPlates] += 1;
+  // 顶板多加一组，保证一开局就有可拧
+  groupPer[nPlates - 1] += 1;
+
+  const usedColors = [];
+  for (let i = 0; i < nPlates; i++) {
+    const g = groupPer[i];
+    const p = {
+      base: buildShape(),
+      k: rnd(0.62, 0.80),
+      ox: rnd(-0.06, 0.06) * (i - (nPlates - 1) / 2) * 1.6,
+      oy: rnd(-0.05, 0.05),
+      rot0: rnd(-0.35, 0.35),
+      color: PALETTE[(i * 2 + 1) % palette.length],
+      idx: i, screws: [], screwDefs: [], state: 'on',
+      vx: 0, vy: 0, vr: 0, alpha: 1, flash: 0
+    };
+    // 螺丝颜色组：每组 3 颗同色
+    for (let k = 0; k < g; k++) {
+      let c;
+      if (k === 0 && Math.random() < 0.65) { c = pick(palette); }
+      else if (usedColors.length && Math.random() < 0.55) { c = pick(usedColors); }
+      else c = pick(palette);
+      usedColors.push(c);
+      for (let m = 0; m < 3; m++) p.screwDefs.push({color: c});
+    }
+    plates.push(p);
+  }
+
+  // 螺丝在板内布点（不重叠）
+  plates.forEach(p => {
+    const pts = [];
+    const N = p.screwDefs.length;
+    const rMax = 0.72;
+    for (let i = 0; i < N; i++) {
+      let best = null;
+      for (let tries = 0; tries < 90; tries++) {
+        const a = rnd(0, Math.PI * 2);
+        const rr = Math.sqrt(Math.random()) * rMax;
+        const x = Math.cos(a) * rr, y = Math.sin(a) * rr * 0.95;
+        const local = {x: x, y: y};
+        // 必须在板内
+        if (!pointInPoly(local.x, local.y, p.base.map(b => ({x: b.x * 0.99, y: b.y * 0.99})))) continue;
+        const minD = 0.34;
+        if (pts.some(q => Math.hypot(q.x - x, q.y - y) < minD)) continue;
+        best = {x, y};
+        break;
+      }
+      if (!best) {
+        const a = (i / N) * Math.PI * 2;
+        best = {x: Math.cos(a) * 0.42, y: Math.sin(a) * 0.42};
+      }
+      pts.push(best);
+      p.screwDefs[i].x = best.x; p.screwDefs[i].y = best.y;
+    }
+  });
+
+  layoutPlates();
+
+  // 实例化螺丝
+  screws = [];
+  plates.forEach(p => {
+    p.screwDefs.forEach(sd => {
+      const s = {def: sd, color: sd.color, plate: p, x: sd.wx, y: sd.wy, state: 'on', locked: false, spin: 0, wob: 0, scale: 1,
+        removeFromPlate: function () { detachScrew(this); }};
+      p.screws.push(s);
+      screws.push(s);
+    });
+  });
+
+  // 收纳盒
+  const nBox = Math.min(3, Math.max(2, 2 + (lv >= 6 ? 1 : 0)));
+  boxes = [];
+  const activeColors = nextBoxColors(nBox);
+  activeColors.forEach(c => boxes.push(makeBox(c)));
+
+  layoutSpares();
+  paintHud();
+}
+
+function makeBox(color) {
+  return {color, items: 3, filled: 0, pop: 0, shake: 0};
+}
+
+function remainingColors() {
+  const m = new Map();
+  screws.forEach(s => { if (s.state === 'on') m.set(s.color, (m.get(s.color) || 0) + 1); });
+  boxes.forEach(b => { if (b.filled > 0) m.set(b.color, (m.get(b.color) || 0) + (3 - b.filled)); });
+  return m;
+}
+function nextBoxColors(n) {
+  // 优先取“当前已解锁螺丝”的颜色，保证不会出现有螺丝却无盒子的死局
+  const avail = new Map();
+  screws.forEach(s => { if (s.state === 'on' && !s.locked) avail.set(s.color, (avail.get(s.color) || 0) + 1); });
+  const rest = remainingColors();
+  const order = [...avail.keys()].sort((a, b) => avail.get(b) - avail.get(a));
+  [...rest.keys()].forEach(c => { if (!order.includes(c)) order.push(c); });
+  return order.slice(0, n);
+}
+
+/* ==================== 遮挡检测 ==================== */
+function updateLocks() {
+  screws.forEach(s => {
+    if (s.state !== 'on') return;
+    let locked = false;
+    for (const p of plates) {
+      if (p.state !== 'on') continue;
+      if (p.idx <= s.plate.idx) continue;      // 只有更上层的板会压住
+      if (pointInPoly(s.x, s.y, p.world)) { locked = true; break; }
+    }
+    s.locked = locked;
+  });
+}
+
+/* ==================== 交互 ==================== */
+function hitScrew(x, y) {
+  let bestS = null, bd = 1e9;
+  for (const s of screws) {
+    if (s.state !== 'on') continue;
+    const d = Math.hypot(s.x - x, s.y - y);
+    if (d < bd) { bd = d; bestS = s; }
+  }
+  return (bestS && bd < 30) ? bestS : null;
+}
+
+cv.addEventListener('pointerdown', e => {
+  if (busy || over) return;
+  const r = cv.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const s = hitScrew(x, y);
+  if (!s) return;
+  if (s.locked) {
+    s.wob = 1; sfxWrong(); Juice.shake('#cv', 4, 160);
+    Juice.float('被压住了', s.x, s.y - 26, {color: '#ffb0b0', size: 14, life: 700});
+    return;
+  }
+  takeScrew(s);
+}, {passive: false});
+
+function takeScrew(s) {
+  s.state = 'fly';
+  sfxRatchet();
+  Juice.vibrate(8);
+  s.spin = 0;
+  const box = boxes.find(b => b.color === s.color && b.filled < 3);
+  const dest = box ? {kind: 'box', box} : null;
+  const spare = spares.find(sp => !sp.screw);
+  if (dest) { box.filled++; box.pop = 1; }
+  else if (spare) { spare.screw = s; }
+  else { /* 由外部先判断 */ }
+
+  if (!dest && !spare) { sfxWrong(); return; }
+
+  const target = dest ? boxSlotPos(dest.box) : {x: spare.x, y: spare.y};
+  s.removeFromPlate();
+  flyTo(s, target, dest ? 'box' : 'spare', dest ? dest.box : spare);
+}
+
+// 螺丝从板列表中移除，方便判断板是否掉落
+function detachScrew(s) {
+  const arr = s.plate.screws;
+  const i = arr.indexOf(s);
+  if (i >= 0) arr.splice(i, 1);
+  ensurePlateFall(s.plate);
+}
+
+
+function ensurePlateFall(p) {
+  if (p.state !== 'on' || p.screws.length > 0) return;
+  p.state = 'fall';
+  p.vx = rnd(-40, 40); p.vy = rnd(60, 120); p.vr = rnd(-2.2, 2.2);
+  sfxGlassFall();
+  updateLocks();
+  checkLevelDone();
+}
+
+function boxSlotPos(box) {
+  const bx = boxLayout();
+  const i = boxes.indexOf(box);
+  const b = bx[i];
+  if (!b) return {x: W / 2, y: boxBox.y};
+  const f = Math.min(3, box.filled) - 1;
+  return {x: b.x + b.w / 2 + (f - 1) * 15, y: b.y + b.h * 0.55};
+}
+function boxLayout() {
+  const n = Math.max(1, boxes.length);
+  const gap = 10;
+  const w = Math.min(120, (boxBox.w - gap * (n - 1)) / n);
+  const total = n * w + gap * (n - 1);
+  const x0 = boxBox.x + (boxBox.w - total) / 2;
+  return boxes.map((b, i) => ({x: x0 + i * (w + gap), y: boxBox.y, w, h: boxBox.h, box: b}));
+}
+
+function flyTo(s, target, kind, holder) {
+  flys.push({
+    s, x0: s.x, y0: s.y, x1: target.x, y1: target.y, t0: performance.now(), dur: 420,
+    kind, holder, done: false
+  });
+}
+function updateFlys(now) {
+  for (let i = flys.length - 1; i >= 0; i--) {
+    const f = flys[i];
+    const t = clamp((now - f.t0) / f.dur, 0, 1);
+    f.s.spin += 0.35;
+    if (t >= 1) {
+      flys.splice(i, 1);
+      if (f.kind === 'box') {
+        sfxClick();
+        f.holder.pop = 1;
+        if (f.holder.filled >= 3) {
+          afterBoxFull(f.holder);
+        }
+      } else {
+        sfxSpare();
+      }
+      // 检查失败
+      if (spares.every(sp => sp.screw) && screws.some(x => x.state === 'on')) {
+        // 还有螺丝未拧、备用全满 → 失败
+        const anyBox = boxes.some(b => b.filled < 3);
+        if (!anyBox) gameOver('备用孔已满');
+        else checkSpareFail();
+      }
+    }
+  }
+}
+function checkSpareFail() {
+  // 备用孔满且当前所有未拧螺丝的颜色都没有可用盒子 → 死局
+  if (spares.every(sp => sp.screw) && !boxes.some(b => b.filled < 3) && screws.some(x => x.state === 'on')) {
+    gameOver('备用孔已满');
+  }
+}
+
+async function afterBoxFull(box) {
+  box.filled = 0;
+  box.clearing = 1;
+  score += 0;
+  const nColor = nextBoxColors(1)[0];
+  await wait(260);
+  const i = boxes.indexOf(box);
+  if (i >= 0 && !over) {
+    if (nColor && screws.some(s => s.state === 'on' && s.color === nColor)) {
+      boxes[i] = makeBox(nColor);
+      boxes[i].pop = 1;
+    } else if (boxes.length > 1) {
+      boxes.splice(i, 1);
+    }
+  }
+  checkLevelDone();
+}
+
+function checkLevelDone() {
+  if (over || win) return;
+  const left = screws.filter(s => s.state === 'on').length;
+  if (left === 0 && plates.every(p => p.state !== 'on')) {
+    win = true;
+    score += 100 + level * 20;
+    addScore(0);
+    sfxWin();
+    Juice.burst(W / 2, board.y + board.h / 2, {count: 40, colors: PALETTE, speed: 380, size: 6, life: 900});
+    Juice.float('LEVEL ' + level + ' CLEAR', W / 2, board.y + board.h / 2, {color: '#ffe08a', size: 24, life: 1200});
+    setTimeout(() => { if (!over) { initLevel(level + 1); } }, 900);
+  }
+}
+
+function addScore(v) {
+  score += v;
+  paintHud();
+  if (score > best) best = score;
+  Juice.setBest('screw', score);
+}
+
+function paintHud() {
+  $('lvl').textContent = level;
+  $('score').textContent = score;
+  $('best').textContent = Math.max(best, score);
+}
+
+function gameOver(reason) {
+  if (over) return;
+  over = true;
+  try { Juice.sfx.over && Juice.sfx.over(); } catch (e) {}
+  Juice.shake('#cv', 12, 420);
+  const isNew = Juice.setBest('screw', score);
+  best = Math.max(best, score);
+  $('ovTitle').textContent = reason || '挑战失败';
+  $('ovScore').textContent = score;
+  $('ovTip').textContent = isNew ? '新纪录！最高分 ' + score : '最高分 ' + best;
+  $('over').classList.add('show');
+}
+
+/* ==================== 道具 ==================== */
+$('pClear').addEventListener('click', () => {
+  if (busy || over || props.clear <= 0) return;
+  const stuck = screws.filter(s => s.state === 'on' && !s.locked);
+  if (!stuck.length) return;
+  props.clear--; paintProps();
+  // 把备用孔里的螺丝自动归位到对应颜色盒子
+  spares.forEach(sp => {
+    if (!sp.screw) return;
+    const box = boxes.find(b => b.color === sp.screw.color && b.filled < 3);
+    if (box) { box.filled++; box.pop = 1; sp.screw.state = 'done'; sp.screw = null; sfxClick(); }
+  });
+  Juice.float('备用孔已清空', W / 2, spareBox.y - 16, {color: '#9fe8ff', size: 16});
+});
+
+$('pAuger').addEventListener('click', () => {
+  if (busy || over || props.auger <= 0) return;
+  if (spareCap >= 8) return;
+  props.auger--; spareCap += 2; paintProps();
+  layoutSpares();
+  sfxClick();
+  Juice.float('+2 临时孔位', W / 2, spareBox.y - 16, {color: '#9fe8ff', size: 16});
+});
+
+$('pSmash').addEventListener('click', () => {
+  if (busy || over || props.smash <= 0) return;
+  props.smash--; paintProps();
+  // 击碎最上层仍带螺丝的板
+  const target = plates.filter(p => p.state === 'on' && p.screws.length).pop();
+  if (!target) return;
+  Juice.burst(target.cx, target.cy, {count: 34, colors: ['#cfe8ff', '#9ec9ff', target.color], speed: 340, size: 5, life: 800, shape: 'square'});
+  Juice.noise(0.3, 0.2, 'highpass', 1200);
+  Juice.shake('#cv', 8, 300);
+  target.screws.slice().forEach(s => { s.state = 'done'; });
+  target.screws.length = 0;
+  target.state = 'fall'; target.vx = rnd(-60, 60); target.vy = rnd(80, 160); target.vr = rnd(-3, 3);
+  updateLocks();
+  checkLevelDone();
+});
+
+function paintProps() {
+  [['clear', 'cClear', 'pClear'], ['auger', 'cAuger', 'pAuger'], ['smash', 'cSmash', 'pSmash']].forEach(([k, cn, bn]) => {
+    $(cn).textContent = props[k];
+    $(cn).classList.toggle('zero', props[k] <= 0);
+    $(bn).style.opacity = props[k] <= 0 ? 0.45 : 1;
+  });
+}
+
+/* ==================== 更新 ==================== */
+function update(dt, now) {
+  plates.forEach(p => {
+    if (p.state === 'fall') {
+      p.vy += 1600 * dt;
+      p.cx += p.vx * dt; p.cy += p.vy * dt;
+      p.fallRot = (p.fallRot || 0) + p.vr * dt;
+      p.alpha -= dt * 0.12;
+      if (p.cy > H + 400) p.state = 'gone';
+    }
+    if (p.flash > 0) p.flash = Math.max(0, p.flash - dt * 3);
+  });
+  boxes.forEach(b => {
+    if (b.pop > 0) b.pop = Math.max(0, b.pop - dt * 3);
+    if (b.shake > 0) b.shake = Math.max(0, b.shake - dt * 3);
+    if (b.clearing > 0) b.clearing = Math.min(1, b.clearing + dt * 4);
+  });
+  screws.forEach(s => {
+    if (s.wob > 0) s.wob = Math.max(0, s.wob - dt * 3);
+  });
+  updateFlys(now);
+}
+
+/* ==================== 绘制 ==================== */
+function drawBg(now) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#1b2338'); g.addColorStop(.5, '#141a2b'); g.addColorStop(1, '#0a0d16');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // 背板孔洞感纹理
+  ctx.save();
+  ctx.globalAlpha = .06;
+  ctx.strokeStyle = '#9fb4ff';
+  for (let y = board.y; y < board.y + board.h; y += 44) {
+    for (let x = 18 + ((y / 44) % 2) * 22; x < W; x += 44) {
+      ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 7); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function platePath(p, ox, oy) {
+  const wx = p.world;
+  ctx.beginPath();
+  ctx.moveTo(wx[0].x + ox, wx[0].y + oy);
+  for (let i = 1; i < wx.length; i++) ctx.lineTo(wx[i].x + ox, wx[i].y + oy);
+  ctx.closePath();
+}
+
+function drawPlates(now) {
+  plates.forEach(p => {
+    if (p.state === 'gone') return;
+    const ox = p.state === 'fall' ? p.cx - p.cx : 0;
+    ctx.save();
+    ctx.globalAlpha = clamp(p.alpha, 0, 1);
+    if (p.state === 'fall') {
+      ctx.translate(p.cx, p.cy);
+      ctx.rotate(p.fallRot || 0);
+      ctx.translate(-p.cx, -p.cy);
+    }
+    // 底层投影
+    platePath(p, 0, 7);
+    ctx.fillStyle = 'rgba(0,0,0,.42)';
+    ctx.fill();
+    // 磨砂亚克力主体
+    const g = ctx.createLinearGradient(p.cx - 100, p.cy - 100, p.cx + 110, p.cy + 120);
+    g.addColorStop(0, hexA(p.color, .42));
+    g.addColorStop(.45, hexA(p.color, .26));
+    g.addColorStop(1, hexA(p.color, .14));
+    platePath(p, 0, 0);
+    ctx.fillStyle = g;
+    ctx.fill();
+    // 高光边缘
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = hexA('#ffffff', .55);
+    ctx.stroke();
+    platePath(p, 0, 2.5);
+    ctx.strokeStyle = hexA(p.color, .8);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // 内部反光斜条
+    ctx.save();
+    platePath(p, 0, 0); ctx.clip();
+    const rg = ctx.createLinearGradient(p.cx - 120, p.cy - 120, p.cx + 20, p.cy + 40);
+    rg.addColorStop(0, 'rgba(255,255,255,.24)');
+    rg.addColorStop(.5, 'rgba(255,255,255,0)');
+    rg.addColorStop(1, 'rgba(255,255,255,.10)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(p.cx - 200, p.cy - 200, 400, 400);
+    ctx.restore();
+    if (p.flash > 0) {
+      platePath(p, 0, 0);
+      ctx.fillStyle = 'rgba(255,255,255,' + (p.flash * .35) + ')';
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+function drawScrews(now) {
+  // 已落在备用孔里的螺丝 + 板上螺丝
+  spares.forEach(sp => { if (sp.screw) drawScrewHead(sp.x, sp.y, sp.screw.color, 1, 0); });
+  screws.forEach(s => {
+    if (s.state !== 'on') return;
+    drawScrewHead(s.x, s.y, s.color, s.locked ? .45 : 1, s.wob);
+  });
+  flys.forEach(f => {
+    const t = clamp((now - f.t0) / f.dur, 0, 1);
+    const e = easeOut(t);
+    const x = f.s.x0 + (f.s.x1 - f.s.x0) * e;
+    const y = f.s.y0 + (f.s.y1 - f.s.y0) * e - Math.sin(Math.PI * t) * 46;
+    drawScrewHead(x, y, f.s.color, 1, 0, f.s.spin);
+  });
+}
+
+function drawScrewHead(x, y, color, alpha, wob, spin) {
+  const r = 13;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  if (wob) ctx.rotate(Math.sin(wob * 22) * 0.16 * wob);
+  if (spin) ctx.rotate(spin);
+  // 孔洞
+  ctx.beginPath(); ctx.arc(0, 2, r + 3, 0, 7);
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fill();
+  // 螺帽
+  const g = ctx.createRadialGradient(-4, -5, 2, 0, 0, r);
+  g.addColorStop(0, hexA('#ffffff', .85));
+  g.addColorStop(.42, color);
+  g.addColorStop(1, PAL_DARK[color] || color);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fillStyle = g; ctx.fill();
+  ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.stroke();
+  // 十字槽
+  ctx.strokeStyle = 'rgba(0,0,0,.42)'; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(7, 0); ctx.moveTo(0, -7); ctx.lineTo(0, 7); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.32)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(-7, -1.4); ctx.lineTo(7, -1.4); ctx.moveTo(-1.4, -7); ctx.lineTo(-1.4, 7); ctx.stroke();
+  if (alpha < 1) {
+    // 锁定标记
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(9, -9, 7, 0, 7);
+    ctx.fillStyle = 'rgba(10,12,20,.86)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.2;
+    // 小锁
+    ctx.beginPath(); ctx.rect(6.4, -10.2, 5.2, 4.2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(9, -10.2, 1.8, Math.PI, 0); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBoxes(now) {
+  const bx = boxLayout();
+  bx.forEach((b, i) => {
+    const box = b.box;
+    const pop = box.pop || 0;
+    const cy = b.y + b.h / 2;
+    ctx.save();
+    ctx.translate(b.x + b.w / 2, cy);
+    const sc = 1 + pop * 0.06;
+    ctx.scale(sc, sc);
+    ctx.translate(-b.w / 2, -b.h / 2);
+    // 盒子
+    const r = 13;
+    roundRect(0, 0, b.w, b.h, r);
+    ctx.fillStyle = hexA(box.color, .22); ctx.fill();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = hexA(box.color, .85); ctx.stroke();
+    // 三个孔位
+    for (let k = 0; k < 3; k++) {
+      const px = b.w / 2 + (k - 1) * 15, py = b.h * 0.55;
+      ctx.beginPath(); ctx.arc(px, py, 5, 0, 7);
+      ctx.fillStyle = k < box.filled ? box.color : 'rgba(255,255,255,.13)';
+      ctx.fill();
+      if (k < box.filled) { ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.stroke(); }
+    }
+    // 顶部色条
+    ctx.fillStyle = hexA(box.color, .9);
+    roundRect(b.w / 2 - 14, -3, 28, 5, 2.5); ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawSpares(now) {
+  spares.forEach(sp => {
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r, 0, 7);
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fill();
+    ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.stroke();
+  });
+  ctx.save();
+  ctx.globalAlpha = .5;
+  ctx.font = '700 10px system-ui';
+  ctx.fillStyle = '#8f98c4';
+  ctx.textAlign = 'left';
+  ctx.fillText('临时备用孔', spareBox.x + 2, spareBox.y - 6);
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function hexA(hex, a) {
+  if (hex[0] !== '#') return hex;
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+function draw(now) {
+  drawBg(now);
+  drawBoxes(now);
+  drawPlates(now);
+  drawScrews(now);
+  drawSpares(now);
+}
+
+/* ==================== 主循环 ==================== */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  tNow = now;
+  update(dt, now);
+  draw(now);
+  requestAnimationFrame(loop);
+}
+
+/* ==================== 启动 ==================== */
+window.addEventListener('resize', () => { resize(); });
+document.addEventListener('visibilitychange', () => { last = performance.now(); });
+
+$('again').addEventListener('click', () => {
+  score = 0; props = {clear: 2, auger: 2, smash: 2};
+  $('over').classList.remove('show');
+  paintProps();
+  initLevel(1);
+});
+$('backHall').addEventListener('click', () => { location.href = 'index.html'; });
+
+/* 自测/排错只读钩子 */
+window.__dbg = () => ({
+  score: score, level: level, over: over, win: win, busy: busy,
+  screws: screws.map(s => ({x: Math.round(s.x), y: Math.round(s.y), st: s.state, lk: !!s.locked, c: s.color})),
+  plates: plates.map(p => ({st: p.state, n: p.screws.filter(x=>x.state==='on').length})),
+  boxes: boxes.map(b => ({c: b.color, f: b.filled, st: b.state})),
+  spares: spares.map(sp => !!sp.screw), spareCap: spareCap,
+  props: {clear: propCounts.clear, auger: propCounts.auger, smash: propCounts.smash}
+});
+
+document.addEventListener('backbutton', () => { location.href = 'index.html'; }, false);
+
+best = (Juice.getStat && Juice.getStat('screw').best) || 0;
+try { Juice.init({ game: 'screw' }); } catch (e) {}
+props = {clear: 2, auger: 2, smash: 2};
+resize();
+initLevel(1);
+paintProps();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

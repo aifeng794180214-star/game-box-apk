@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07070f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no,email=no,address=no">
+<title>解压小游戏合集 · Game Box</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overscroll-behavior:none;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:#07070f;color:#f6f6fb;overflow-x:hidden;position:relative;
+    -webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+    padding:calc(env(safe-area-inset-top,0px) + 18px) calc(env(safe-area-inset-right,0px) + 16px)
+            calc(env(safe-area-inset-bottom,0px) + 30px) calc(env(safe-area-inset-left,0px) + 16px);
+  }
+  /* ===== 极光背景 ===== */
+  .bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:
+      radial-gradient(120% 80% at 50% -10%,#151234 0%,#0a0a16 42%,#07070f 100%);}
+  .blob{position:absolute;border-radius:50%;filter:blur(56px);opacity:.5;will-change:transform;}
+  .b1{width:56vw;height:56vw;left:-18vw;top:-12vh;background:radial-gradient(circle at 35% 35%,#6b4cff,#3a1d8a 60%,transparent 72%);animation:drift1 16s ease-in-out infinite;}
+  .b2{width:48vw;height:48vw;right:-16vw;top:2vh;background:radial-gradient(circle at 50% 50%,#00c8ff,#0a3f66 62%,transparent 74%);opacity:.32;animation:drift2 19s ease-in-out infinite;}
+  .b3{width:64vw;height:64vw;left:12vw;bottom:-30vh;background:radial-gradient(circle at 50% 50%,#ff4d8d,#4a0f2a 60%,transparent 72%);opacity:.26;animation:drift1 22s ease-in-out infinite reverse;}
+  .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;
+    background-image:radial-gradient(rgba(255,255,255,.9) .5px,transparent .5px);background-size:3px 3px;}
+  @keyframes drift1{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(6vw,4vh,0) scale(1.08)}}
+  @keyframes drift2{0%,100%{transform:translate3d(0,0,0) scale(1.04)}50%{transform:translate3d(-5vw,6vh,0) scale(.96)}}
+
+  .wrap{position:relative;z-index:2;max-width:720px;margin:0 auto;}
+
+  /* ===== 顶栏 ===== */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0;}
+  .logo{
+    width:50px;height:50px;border-radius:16px;display:grid;place-items:center;flex:none;position:relative;
+    background:linear-gradient(150deg,#8f6bff 0%,#c94bff 52%,#ff5f97 100%);
+    box-shadow:0 12px 26px -10px rgba(160,90,255,.95),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -10px 20px rgba(60,0,80,.35);
+  }
+  .logo::after{content:'';position:absolute;inset:1px;border-radius:15px;background:linear-gradient(180deg,rgba(255,255,255,.28),transparent 55%);pointer-events:none;}
+  h1{font-size:21px;font-weight:850;letter-spacing:-.5px;line-height:1.1;white-space:nowrap;}
+  .sub{font-size:9.5px;font-weight:700;letter-spacing:2.2px;color:#9a9ab8;margin-top:5px;text-transform:uppercase;}
+  .icon-btn{
+    width:42px;height:42px;flex:none;border-radius:14px;display:grid;place-items:center;color:#e9e9f5;
+    border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);
+    -webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16);transition:transform .16s,background .2s;cursor:pointer;
+  }
+  .icon-btn:active{transform:scale(.9);background:rgba(255,255,255,.12);}
+
+  /* ===== 数据条 ===== */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:18px;}
+  .stat{
+    padding:11px 12px;border-radius:16px;position:relative;overflow:hidden;
+    background:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.035));
+    border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(16px) saturate(150%);
+    -webkit-backdrop-filter:blur(16px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.14);
+  }
+  .stat b{display:block;font-size:17px;font-weight:850;letter-spacing:-.4px;font-variant-numeric:tabular-nums;}
+  .stat span{display:block;font-size:9.5px;font-weight:700;letter-spacing:1.1px;color:#9c9cb8;margin-top:4px;text-transform:uppercase;}
+
+  /* ===== 卡片网格 ===== */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  @media(min-width:620px){.grid{grid-template-columns:repeat(3,1fr);gap:14px;}}
+
+  .card{
+    position:relative;display:block;text-decoration:none;color:inherit;isolation:isolate;overflow:hidden;
+    border-radius:22px;padding:14px 13px 13px;
+    min-height:174px;display:flex;flex-direction:column;
+    background:linear-gradient(158deg,rgba(255,255,255,.15) 0%,rgba(255,255,255,.055) 46%,rgba(255,255,255,.03) 100%);
+    border:1px solid rgba(255,255,255,.16);
+    -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+    box-shadow:0 14px 30px -18px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.24);
+    transition:transform .18s cubic-bezier(.2,.9,.3,1),box-shadow .24s,border-color .24s;
+    will-change:transform;
+  }
+  .card::before{ /* 顶部霓虹晕染 */
+    content:'';position:absolute;inset:-1px;z-index:-1;opacity:.9;pointer-events:none;
+    background:
+      radial-gradient(120% 76% at 12% 0%,var(--a1) 0%,transparent 62%),
+      radial-gradient(110% 70% at 96% 88%,var(--a2) 0%,transparent 58%);
+    opacity:.52;filter:blur(9px);
+  }
+  .card::after{ /* 玻璃高光斜带 */
+    content:'';position:absolute;inset:0;pointer-events:none;border-radius:22px;
+    background:linear-gradient(115deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,0) 34%,rgba(255,255,255,0) 70%,rgba(255,255,255,.07) 100%);
+  }
+  .card:active{transform:scale(.955);border-color:rgba(255,255,255,.3);box-shadow:0 6px 18px -10px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.3);}
+  @media(hover:hover){.card:hover{transform:translateY(-5px);box-shadow:0 22px 42px -20px rgba(0,0,0,.95),0 0 0 1px rgba(255,255,255,.1),inset 0 1px 0 rgba(255,255,255,.3);}}
+
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .ico{
+    width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none;position:relative;
+    background:linear-gradient(150deg,var(--a1),var(--a2));
+    box-shadow:0 10px 22px -10px var(--a1),inset 0 1px 0 rgba(255,255,255,.55),inset 0 -8px 16px rgba(0,0,0,.22);
+  }
+  .ico svg{width:30px;height:30px;display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,.28));}
+  .best{
+    display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:9px;
+    font-size:10.5px;font-weight:800;color:#ffe9a8;letter-spacing:-.1px;font-variant-numeric:tabular-nums;
+    background:rgba(255,196,64,.12);border:1px solid rgba(255,196,64,.26);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12);white-space:nowrap;
+  }
+  .best.none{color:#a7a7c0;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);}
+  .best svg{width:11px;height:11px;}
+
+  .meta{margin-top:auto;padding-top:14px;}
+  .name{font-size:16px;font-weight:820;letter-spacing:-.35px;line-height:1.2;display:flex;align-items:center;gap:6px;}
+  .en{font-size:9px;font-weight:750;letter-spacing:1.5px;color:#a9a9c6;margin-top:4px;text-transform:uppercase;}
+  .tags{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap;}
+  .tag{
+    font-size:9.5px;font-weight:700;padding:3.5px 7px;border-radius:7px;color:#e2e2f2;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.1);
+  }
+  .plays{position:absolute;right:13px;bottom:14px;font-size:9.5px;font-weight:700;color:#8f8fab;letter-spacing:.2px;}
+  .plays b{color:#cfcfe6;font-variant-numeric:tabular-nums;}
+
+  /* 进场 */
+  @keyframes rise{from{opacity:0;transform:translateY(16px) scale(.97);}to{opacity:1;transform:none;}}
+  .card{animation:rise .58s cubic-bezier(.2,.85,.28,1) both;}
+  .card:nth-child(1){animation-delay:.05s}.card:nth-child(2){animation-delay:.11s}
+  .card:nth-child(3){animation-delay:.17s}.card:nth-child(4){animation-delay:.23s}
+  .card:nth-child(5){animation-delay:.29s}.card:nth-child(6){animation-delay:.35s}
+
+  .tip{
+    margin-top:20px;text-align:center;font-size:11px;line-height:1.9;color:#75758f;letter-spacing:.2px;
+  }
+  .tip b{color:#a9a9c8;font-weight:700;}
+  @media(max-height:660px){.stats{display:none}.card{min-height:150px;padding:11px 11px 10px}.ico{width:44px;height:44px;border-radius:14px}.ico svg{width:26px;height:26px}.meta{padding-top:10px}}
+</style>
+</head>
+<body>
+<div class="bg"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i></div>
+<div class="grain"></div>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <svg width="27" height="27" viewBox="0 0 48 48" fill="none">
+          <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#f0e6ff"/></linearGradient></defs>
+          <rect x="7" y="15" width="34" height="21" rx="9" fill="url(#lg)" opacity=".95"/>
+          <rect x="13" y="22" width="8" height="3" rx="1.5" fill="#8b5cf6"/>
+          <rect x="15.5" y="19.5" width="3" height="8" rx="1.5" fill="#8b5cf6"/>
+          <circle cx="33" cy="23" r="2.6" fill="#ff5f97"/><circle cx="37.5" cy="27.5" r="2.6" fill="#22c8ff"/>
+        </svg>
+      </div>
+      <div>
+        <h1>解压小游戏合集</h1>
+        <div class="sub">Game Box · 6 Mini Games</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="muteBtn" aria-label="音效开关"></button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="stGames">6</b><span>游戏 Games</span></div>
+    <div class="stat"><b id="stPlays">0</b><span>游玩 Plays</span></div>
+    <div class="stat"><b id="stBest">0</b><span>最高分 Best</span></div>
+  </div>
+
+  <main class="grid" id="grid"></main>
+
+  <p class="tip">💡 游戏内左上角 <b>返回</b> 随时切回大厅 · 右上角可一键静音<br>Tap <b>返回</b> in-game to come back here anytime</p>
+</div>
+
+<script src="juice.js"></script>
+<script>
+/* ---------- 6 款游戏配置 + 专属矢量图标 ---------- */
+const GAMES = [
+  {
+    key:'blockblast', file:'blockblast.html', name:'方块消除', en:'Block Blast',
+    tags:['消除','益智','连击'], a1:'#8b7bff', a2:'#c44bff', legacy:'blockblast_best_v1',
+    icon:`<svg viewBox="0 0 48 48" fill="none">
+      <defs><linearGradient id="bb1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#ffd9ff"/></linearGradient>
+      <linearGradient id="bb2" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe38a"/><stop offset="1" stop-color="#ffb340"/></linearGradient></defs>
+      <rect x="6" y="6" width="15" height="15" rx="4.5" fill="url(#bb1)" opacity=".95"/>
+      <rect x="23" y="19" width="19" height="10" rx="4" fill="url(#bb2)"/>
+      <rect x="6" y="23" width="15" height="19" rx="4.5" fill="#fff" opacity=".8"/>
+      <rect x="23" y="31" width="10" height="11" rx="3.5" fill="#ff9ec9"/>
+      <rect x="35" y="31" width="7" height="11" rx="3" fill="#fff" opacity=".55"/>
+    </svg>`
+  },
+  {
+    key:'watermelon', file:'watermelon.html', name:'合成大西瓜', en:'Watermelon Merge',
+    tags:['合成','物理','休闲'], a1:'#31d68b', a2:'#0fa4a4', legacy:'wm_best_v1',
+    icon:`<svg viewBox="0 0 48 48" fill="none">
+      <defs><linearGradient id="wm1" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff6b81"/><stop offset="1" stop-color="#e8324f"/></linearGradient></defs>
+      <circle cx="24" cy="25" r="16.5" fill="#1fbf6b"/>
+      <circle cx="24" cy="25" r="13.6" fill="#eafbe6"/>
+      <path d="M24 11.6A13.4 13.4 0 0 1 37.4 25H10.6A13.4 13.4 0 0 1 24 11.6Z" fill="url(#wm1)"/>
+      <ellipse cx="18" cy="19" rx="1.7" ry="2.4" fill="#3a1220" transform="rotate(-20 18 19)"/>
+      <ellipse cx="27" cy="17.4" rx="1.6" ry="2.3" fill="#3a1220" transform="rotate(14 27 17.4)"/>
+      <ellipse cx="22.6" cy="22.6" rx="1.5" ry="2.1" fill="#3a1220" transform="rotate(-6 22.6 22.6)"/>
+      <path d="M17 25c0-1.5 2-2.5 7-2.5s7 1 7 2.5" stroke="#fff" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/>
+    </svg>`
+  },
+  {
+    key:'dots', file:'dots.html', name:'点点相连', en:'Dots Connect',
+    tags:['连线','解谜','闯关'], a1:'#22b8ff', a2:'#5b5bff', legacy:'dots_best_v1',
+    icon:`<svg viewBox="0 0 48 48" fill="none">
+      <defs><linearGradient id="dt1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#bfe9ff"/></linearGradient></defs>
+      <path d="M10 34 L19 15 L32 24 L39 12" stroke="url(#dt1)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+      <circle cx="10" cy="34" r="5.2" fill="#fff"/><circle cx="10" cy="34" r="2.4" fill="#22b8ff"/>
+      <circle cx="19" cy="15" r="5.2" fill="#fff" opacity=".95"/><circle cx="19" cy="15" r="2.4" fill="#ff5f97"/>
+      <circle cx="32" cy="24" r="5.2" fill="#fff" opacity=".95"/><circle cx="32" cy="24" r="2.4" fill="#ffd166"/>
+      <circle cx="39" cy="12" r="5.2" fill="#fff" opacity=".95"/><circle cx="39" cy="12" r="2.4" fill="#7bffb2"/>
+    </svg>`
+  },
+  {
+    key:'snake', file:'snake.html', name:'贪食蛇大作战', en:'Snake Arena',
+    tags:['街机','竞技','操作'], a1:'#a4e856', a2:'#00c48c', legacy:'snake_best',
+    icon:`<svg viewBox="0 0 48 48" fill="none">
+      <defs><linearGradient id="sk1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e6ff9e"/><stop offset="1" stop-color="#7bdc4a"/></linearGradient></defs>
+      <path d="M9 32h13a6 6 0 0 0 6-6 6 6 0 0 1 6-6h4" stroke="url(#sk1)" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="38" cy="20" r="4.6" fill="#eefcb8"/>
+      <circle cx="39.4" cy="18.6" r="1.7" fill="#1b3a12"/>
+      <circle cx="40" cy="34" r="5.4" fill="#ff5f6d"/>
+      <circle cx="38.2" cy="32.2" r="1.6" fill="#ffd9dd"/>
+    </svg>`
+  },
+  {
+    key:'fruit', file:'fruit.html', name:'水果忍者', en:'Fruit Ninja',
+    tags:['街机','反应','连击'], a1:'#ff6b81', a2:'#ffb03a', legacy:'fruitNinja.best.v1',
+    icon:`<svg viewBox="0 0 48 48" fill="none">
+      <defs><linearGradient id="fr1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff8b6b"/><stop offset="1" stop-color="#ff2f5e"/></linearGradient>
+      <linearGradient id="fr2" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#e8f2ff"/><stop offset="1" stop-color="#fff"/></linearGradient></defs>
+      <circle cx="27" cy="27" r="11" fill="url(#fr1)"/>
+      <path d="M27 16c1.2-3 3-4.6 5.6-5" stroke="#4bd07a" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M14 40 L36 10" stroke="url(#fr2)" stroke-width="4" stroke-linecap="round"/>
+      <path d="M30 28c-1.2 2-3.4 3-5.8 2.6" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+    </svg>`
+  },
+  {
+    key:'brick', file:'brick.html', name:'物理弹球', en:'Brick Breaker',
+    tags:['弹球','物理','打砖块'], a1:'#ffb03a', a2:'#ff5f6d', legacy:'brick_best',
+    icon:`<svg viewBox="0 0 48 48" fill="none">
+      <defs><linearGradient id="br1" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe08a"/><stop offset="1" stop-color="#ffa41c"/></linearGradient>
+      <linearGradient id="br2" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff9aa8"/><stop offset="1" stop-color="#ff5470"/></linearGradient></defs>
+      <rect x="6" y="8" width="10" height="7" rx="2.4" fill="url(#br1)"/>
+      <rect x="19" y="8" width="10" height="7" rx="2.4" fill="url(#br2)"/>
+      <rect x="32" y="8" width="10" height="7" rx="2.4" fill="#9d8cff"/>
+      <rect x="6" y="18" width="10" height="7" rx="2.4" fill="#5ee0c7"/>
+      <rect x="19" y="18" width="10" height="7" rx="2.4" fill="url(#br1)"/>
+      <rect x="32" y="18" width="10" height="7" rx="2.4" fill="url(#br2)"/>
+      <circle cx="24" cy="35" r="4.6" fill="#fff"/>
+      <rect x="15" y="41" width="18" height="3.4" rx="1.7" fill="#8b7bff"/>
+    </svg>`
+  }
+];
+
+/* ---------- 读取存档 ---------- */
+function stats() {
+  const map = Juice.store.json('gb:best:v2', {}) || {};
+  const out = {};
+  GAMES.forEach(g => {
+    let s = map[g.key] || {};
+    let best = +s.best || 0;
+    if (!best && g.legacy) {           // 兼容旧版本存档
+      try {
+        let raw = localStorage.getItem(g.legacy);
+        if (raw) {
+          let v = JSON.parse(raw);
+          if (typeof v === 'number') best = v;
+          else if (v && typeof v === 'object') best = +v.classic || +v.endless || +v.best || 0;
+        }
+      } catch (e) {}
+    }
+    out[g.key] = { best: best, plays: +s.plays || 0 };
+  });
+  return out;
+}
+
+const S = stats();
+const grid = document.getElementById('grid');
+const fmt = n => n >= 10000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+
+grid.innerHTML = GAMES.map(g => {
+  const st = S[g.key] || { best: 0, plays: 0 };
+  const best = st.best > 0
+    ? `<span class="best"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h12v2h3v3a5 5 0 01-5 5h-.4A5 5 0 0112 15a5 5 0 01-3.6-2H8a5 5 0 01-5-5V5h3V3zm0 4H5v1a3 3 0 003 3V7zm13 0h-1v4a3 3 0 003-3V7h-2zM10 16h4v2h3v3H7v-3h3v-2z"/></svg>${fmt(st.best)}</span>`
+    : `<span class="best none">暂无记录</span>`;
+  return `<a class="card" href="${g.file}" data-key="${g.key}" style="--a1:${g.a1};--a2:${g.a2}">
+    <div class="card-top">
+      <div class="ico">${g.icon}</div>
+      ${best}
+    </div>
+    <div class="meta">
+      <div class="name">${g.name}</div>
+      <div class="en">${g.en}</div>
+      <div class="tags">${g.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+    </div>
+    ${st.plays ? `<span class="plays">已玩 <b>${st.plays}</b> 次</span>` : ''}
+  </a>`;
+}).join('');
+
+const totalPlays = Object.values(S).reduce((a, b) => a + b.plays, 0);
+const topBest = Math.max(0, ...Object.values(S).map(v => v.best));
+document.getElementById('stPlays').textContent = totalPlays;
+document.getElementById('stBest').textContent = topBest ? fmt(topBest) : '—';
+document.getElementById('stGames').textContent = GAMES.length;
+
+/* ---------- 音效开关 ---------- */
+const muteBtn = document.getElementById('muteBtn');
+const ICON_ON = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 5.5a9 9 0 010 13"/></svg>';
+const ICON_OFF = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z" fill="currentColor" stroke="none"/><path d="M16 9l5 6M21 9l-5 6"/></svg>';
+function paintMute() {
+  muteBtn.innerHTML = Juice.muted ? ICON_OFF : ICON_ON;
+  muteBtn.style.color = Juice.muted ? '#8a8aa6' : '#fff';
+}
+paintMute();
+muteBtn.addEventListener('click', () => {
+  Juice.toggleMute();
+  paintMute();
+  if (!Juice.muted) Juice.sfx.click();
+  Juice.vibrate(8);
+  muteBtn.animate([{ transform: 'scale(.85)' }, { transform: 'scale(1.1)' }, { transform: 'scale(1)' }], { duration: 240, easing: 'ease-out' });
+});
+
+/* ---------- 卡片点击：音效 + 微缩放 + 轻震动 ---------- */
+let navLock = false;
+grid.addEventListener('click', e => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  e.preventDefault();
+  if (navLock) return;
+  navLock = true;
+  Juice.sfx.click();
+  Juice.vibrate(10);
+  card.style.transform = 'scale(.94)';
+  setTimeout(() => { location.href = card.getAttribute('href'); }, 130);
+});
+
+/* 从游戏返回大厅（bfcache 恢复）时刷新最高分徽章 */
+window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+
+/* Android 返回键：大厅内退出应用 */
+document.addEventListener('backbutton', () => { try { navigator.app.exitApp(); } catch (e) {} }, false);
+if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+  try { window.Capacitor.Plugins.App.addListener('backButton', () => window.Capacitor.Plugins.App.exitApp()); } catch (e) {}
+}
+</script>
+</body>
+</html>
